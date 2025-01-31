@@ -9,7 +9,7 @@ from stix2 import Identity
 from dotenv import load_dotenv
 from stix2.serialization import fp_serialize
 
-from ransomware2stix.parser import parse_victims
+from ransomware2stix.parser import Parser
 
 def configureLogging():
     # Configure logging
@@ -64,7 +64,9 @@ def main(args: Args):
     output_path = Path('output/ransomware2stix-bundle.json')
     output_path.parent.mkdir(exist_ok=True, parents=True)
     setLogFile(logging.root, Path(f"output/ransomware2stix-log.txt"))
-    p = parse_victims(args.min_discovered, args.max_discovered)
+
+    p = Parser(write_fs=True)
+    p.parse_all_victims(args.min_discovered, args.max_discovered)
     with open(output_path, 'w') as f:
         fp_serialize(p.parsed_objects, f, indent=4)
     logging.info(f"Wrote bundle output to `{output_path}`")

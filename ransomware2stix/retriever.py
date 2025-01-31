@@ -19,7 +19,8 @@ class Retriever():
         return {group['name']: group for group in r.json()}
     
     def get_victims(self):
-        return requests.get('https://data.ransomware.live/victims.json').json()
+        resp = requests.get('https://data.ransomware.live/victims.json')
+        return resp.json()
     
     def get_default_objects(self):
         return [requests.get(url).json() for url in DEFAULT_OBJECT_URLS]

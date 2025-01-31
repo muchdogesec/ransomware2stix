@@ -2,12 +2,14 @@
 
 import itertools
 import logging
+from pathlib import Path
+import shutil
 import uuid
 
 import requests
 
 from ransomware2stix.retriever import Retriever
-from stix2 import IntrusionSet, Relationship, Identity, Incident, Tool, AttackPattern
+from stix2 import IntrusionSet, Relationship, Identity, Incident, Tool, AttackPattern, FileSystemStore
 from datetime import datetime
 from stix2extensions.tools import crypto2stix
 
@@ -91,15 +93,21 @@ TOOL_MAPPING = {
 
 
 class Parser:
+    _fs = None
     CREATED_BY_REF = "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
     OBJECT_MARKING_REFS = [
         "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
         "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
     ]
-    def __init__(self, mode='data'):
+    def __init__(self, write_fs=False):
         self.__parsed_groups = {}
         self.__parsed_objects = []
         self.__added_objects = set()
+        if write_fs:
+            fs_path = Path('stix2_output')
+            shutil.rmtree(fs_path, ignore_errors=True)
+            fs_path.mkdir(parents=True, exist_ok=True)
+            self._fs = FileSystemStore(stix_dir=fs_path, allow_custom=True)
         self.locations = {location['country']: location for location in Retriever().get_location_objects()}
         self.__tools = {}
         self.add_object(Retriever().get_default_objects())
@@ -115,6 +123,7 @@ class Parser:
             return
         self.__added_objects.add(object['id'])
         self.__parsed_objects.append(object)
+        self._fs and self._fs.add(object)
 
     @property
     def parsed_objects(self):
@@ -285,7 +294,8 @@ class Parser:
         victim_name = victim['victim']
         mapped_sector = SECTOR_MAPPING.get(victim['activity'])
         if victim['activity'] not in SECTOR_MAPPING:
-            logging.warning('unrecognized activity: %s', victim['activity'])
+            logging.warning('unrecognized activity/sector: %s', victim['activity'])
+            SECTOR_MAPPING.update({victim['activity']: None})
         identity = Identity(
             id="identity--" + str(uuid.uuid5(NAMESPACE, victim_name)),
             created_by_ref=self.CREATED_BY_REF,
@@ -356,22 +366,20 @@ class Parser:
         if not resp.ok or resp_data.get('error'):
             raise GroupError(f"got {resp.status_code} for group: {resp_data}")
         return self.parse_group(resp_data)
+    
+    def parse_all_victims(self, start_date=None, end_date=None):
+        if not start_date:
+            start_date = datetime.min
+        if not end_date:
+            end_date = datetime.max
+        for i, victim in enumerate(Retriever().get_victims()):
+            discovered_on = parse_date(victim['discovered']).replace(hour=0, minute=0, second=0, microsecond=0)
+            if discovered_on < start_date or discovered_on > end_date:
+                continue
+            try:
+                self.parse_victim(victim)
+            except Exception as e:
+                logging.exception(f"failed on [{i}] - {victim}")
 
-        
-def parse_victims(start_date=None, end_date=None):
-    if not start_date:
-        start_date = datetime.min
-    if not end_date:
-        end_date = datetime.max
-
-    p = Parser()
-    for i, victim in enumerate(Retriever().get_victims()):
-        discovered_on = parse_date(victim['discovered']).replace(hour=0, minute=0, second=0, microsecond=0)
-        if discovered_on < start_date or discovered_on > end_date:
-            continue
-        try:
-            p.parse_victim(victim)
-        except Exception as e:
-            logging.exception(f"failed on [{i}] - {victim}")
-
-    return p
+        return self
+    
