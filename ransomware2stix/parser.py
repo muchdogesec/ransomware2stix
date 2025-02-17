@@ -377,7 +377,8 @@ class Parser:
     @classmethod
     def parse_all_victims(cls, start_date=None, end_date=None, combine_bundle=False, groups=[], write_fs=False):
         parsers: dict[str, Parser] = {}
-        default_parser = Parser(write_fs=write_fs)
+        if combine_bundle:
+            default_parser = Parser(write_fs=write_fs)
         if not start_date:
             start_date = datetime.min
         if not end_date:
