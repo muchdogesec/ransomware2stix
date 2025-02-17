@@ -8,7 +8,7 @@ import uuid
 
 import requests
 
-from ransomware2stix.retriever import Retriever
+from ransomware2stix import retriever
 from stix2 import IntrusionSet, Relationship, Identity, Incident, Tool, AttackPattern, FileSystemStore
 from datetime import datetime
 from stix2extensions.tools import crypto2stix
@@ -99,19 +99,21 @@ class Parser:
         "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
         "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
     ]
-    def __init__(self, write_fs=False):
+    def __init__(self, write_fs=False, group_name=None):
         self.__parsed_groups = {}
         self.__parsed_objects = []
         self.__added_objects = set()
+        self.group_name = group_name
         if write_fs:
             fs_path = Path('stix2_output')
-            shutil.rmtree(fs_path, ignore_errors=True)
+            if group_name:
+                fs_path = fs_path/"groups"/group_name
             fs_path.mkdir(parents=True, exist_ok=True)
             self._fs = FileSystemStore(stix_dir=fs_path, allow_custom=True)
-        self.locations = {location['country']: location for location in Retriever().get_location_objects()}
+        self.locations = {location['country']: location for location in retriever.get_location_objects()}
         self.__tools = {}
-        self.add_object(Retriever().get_default_objects())
-        # self._groups = Retriever().get_groups()
+        self.add_object(retriever.get_default_objects())
+        # self._groups = retriever.get_groups()
         
         
     def add_object(self, object):
@@ -128,6 +130,10 @@ class Parser:
     @property
     def parsed_objects(self):
         return self.__parsed_objects
+
+    @property
+    def bundle(self):
+        return dict(type='bundle', id='bundle--'+str(uuid.uuid4()), objects=self.parsed_objects)
 
     def parse_group(self, group):
         group_name = group['name']
@@ -262,7 +268,7 @@ class Parser:
     def parse_ttp(self, group_object, ttps):
         attack_ids = {tactic['tactic_id']: [technique['technique_id'] for technique in tactic['techniques']] for tactic in ttps }
         technique_ids = list(itertools.chain(*attack_ids.values()))
-        attack_objects = Retriever().get_attack_objects(technique_ids)
+        attack_objects = retriever.get_attack_objects(technique_ids)
         relationship_objects = []
         for obj in attack_objects:
             attack_id = obj['external_references'][0]['external_id']
@@ -292,9 +298,10 @@ class Parser:
         )
         group_name = victim['group']
         victim_name = victim['victim']
+
         mapped_sector = SECTOR_MAPPING.get(victim['activity'])
         if victim['activity'] not in SECTOR_MAPPING:
-            logging.warning('unrecognized activity/sector: %s', victim['activity'])
+            logging.warning('unrecognized activity/sector for victim (%s): %s', victim_name, victim['activity'])
             SECTOR_MAPPING.update({victim['activity']: None})
         identity = Identity(
             id="identity--" + str(uuid.uuid5(NAMESPACE, victim_name)),
@@ -354,7 +361,7 @@ class Parser:
                 )
             )
         except Exception as e:
-            logging.debug(f'failed to get group {group_name}: {e}')
+            logging.debug(f'failed to get group {group_name}: {e}', exc_info=True)
         return identity
 
     def get_group(self, group_name):
@@ -367,19 +374,32 @@ class Parser:
             raise GroupError(f"got {resp.status_code} for group: {resp_data}")
         return self.parse_group(resp_data)
     
-    def parse_all_victims(self, start_date=None, end_date=None):
+    @classmethod
+    def parse_all_victims(cls, start_date=None, end_date=None, combine_bundle=False, groups=[], write_fs=False):
+        parsers: dict[str, Parser] = {}
+        default_parser = Parser(write_fs=write_fs)
         if not start_date:
             start_date = datetime.min
         if not end_date:
             end_date = datetime.max
-        for i, victim in enumerate(Retriever().get_victims()):
+        for i, victim in enumerate(retriever.get_victims()):
             discovered_on = parse_date(victim['discovered']).replace(hour=0, minute=0, second=0, microsecond=0)
             if discovered_on < start_date or discovered_on > end_date:
                 continue
+
+            group_name = victim.get('group', victim.get('group_name'))
+            if groups and group_name not in groups:
+                continue
+            if not combine_bundle:
+                parser = parsers.get(group_name)
+                if not parser:
+                    parser = parsers.setdefault(group_name, Parser(write_fs=write_fs, group_name=group_name))
+            else:
+                parser = parsers.setdefault("all-groups-combined", default_parser)
+            
             try:
-                self.parse_victim(victim)
+                parser.parse_victim(victim)
             except Exception as e:
                 logging.exception(f"failed on [{i}] - {victim}")
-
-        return self
+        return parsers
     

@@ -1,10 +1,12 @@
 import argparse
+import contextlib
 from datetime import datetime
 
 from dataclasses import dataclass
 import json
 from pathlib import Path
 import logging
+import shutil
 from stix2 import Identity
 from dotenv import load_dotenv
 from stix2.serialization import fp_serialize
@@ -43,6 +45,8 @@ def parse_identity(str):
 class Args:
     min_discovered: datetime
     max_discovered: datetime
+    group_name:     str
+    combine:        bool
 
 def parse_dt_arg(value):
     """Convert the created timestamp to a datetime object."""
@@ -55,21 +59,26 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Convert text file to detection format.')
     parser.add_argument('--min_discovered', default=datetime.min, help='Minimum discovered date for incident/victim', type=parse_dt_arg)
     parser.add_argument('--max_discovered', default=datetime.max, help='Maximum discovered date for incident/victim', type=parse_dt_arg)
+    parser.add_argument('--group_name', required=False, help='Only process data related to group')
+    parser.add_argument('--combine', action='store_true', help='Should only create one bundle. setting to false will make separate bundle per group.')
     args: Args = parser.parse_args()
     return args
 
 
     
 def main(args: Args):
-    output_path = Path('output/ransomware2stix-bundle.json')
+    output_path = Path('stix2_output/ransomware2stix-bundle.json')
+    with contextlib.suppress(Exception):
+        shutil.rmtree(output_path.parent)
     output_path.parent.mkdir(exist_ok=True, parents=True)
-    setLogFile(logging.root, Path(f"output/ransomware2stix-log.txt"))
+    setLogFile(logging.root, Path(f"stix2_output/ransomware2stix-log.txt"))
 
-    p = Parser(write_fs=True)
-    p.parse_all_victims(args.min_discovered, args.max_discovered)
-    with open(output_path, 'w') as f:
-        fp_serialize(p.parsed_objects, f, indent=4)
-    logging.info(f"Wrote bundle output to `{output_path}`")
+    groups = Parser.parse_all_victims(args.min_discovered, args.max_discovered, groups=args.group_name and [args.group_name], combine_bundle=args.combine, write_fs=True)
+    for group_name, parser in groups.items():
+        path = output_path.with_name(f'ransomware2stix_bundle--{group_name}.json')
+        with open(path, 'w') as f:
+            fp_serialize(parser.bundle, f, indent=4)
+            logging.info(f"Wrote bundle output for `{group_name}` to `{path}`")
 
 if __name__ == '__main__':
     main(parse_args())
