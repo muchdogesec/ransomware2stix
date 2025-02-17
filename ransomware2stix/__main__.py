@@ -34,7 +34,7 @@ def setLogFile(logger, file: Path):
     handler.formatter = logging.Formatter(fmt='%(levelname)s %(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
     handler.setLevel(logging.DEBUG)
     logger.addHandler(handler)
-    logger.info("=====================txt2stix======================")
+    logger.info("=====================ransomware2stix======================")
 
 load_dotenv()
 

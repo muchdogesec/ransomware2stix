@@ -39,7 +39,7 @@ pip3 install -r requirements.txt
 ## Run
 
 ```shell
-
+python -m ransomware2stix
 
 --min_discovered and --max_discovered
 ```

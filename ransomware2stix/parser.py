@@ -105,7 +105,8 @@ class Parser:
         self.__added_objects = set()
         self.group_name = group_name
         if write_fs:
-            fs_path = Path('stix2_output')
+        if write_fs:
+            fs_path = Path('stix2_objects')
             if group_name:
                 fs_path = fs_path/"groups"/group_name
             fs_path.mkdir(parents=True, exist_ok=True)

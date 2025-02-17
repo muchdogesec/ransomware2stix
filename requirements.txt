@@ -1,0 +1,26 @@
+antlr4-python3-runtime==4.9.3
+attrs==25.1.0
+certifi==2024.12.14
+charset-normalizer==3.4.1
+idna==3.10
+importlib_metadata==8.6.1
+jsonschema==4.23.0
+jsonschema-specifications==2024.10.1
+packaging==24.2
+PyJWT==2.10.1
+python-arango==8.1.4
+python-dotenv==1.0.1
+pytz==2024.2
+referencing==0.36.2
+requests==2.32.3
+requests-toolbelt==1.0.0
+rpds-py==0.22.3
+setuptools==75.8.0
+simplejson==3.19.3
+six==1.17.0
+stix2==3.0.1
+stix2-patterns==2.0.0
+tqdm==4.67.1
+urllib3==2.3.0
+zipp==3.21.0
+stix2extensions @ https://github.com/muchdogesec/stix2extensions/releases/download/main-2024-11-29-08-23-28/stix2extensions-0.0.2b1-py3-none-any.whl#sha256=d2e6ec8682fd175fca91eae472b120810260ea0a4737849572c2d5e69ffdefd3
