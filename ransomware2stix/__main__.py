@@ -59,19 +59,19 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Convert text file to detection format.')
     parser.add_argument('--min_discovered', default=datetime.min, help='Minimum discovered date for incident/victim', type=parse_dt_arg)
     parser.add_argument('--max_discovered', default=datetime.max, help='Maximum discovered date for incident/victim', type=parse_dt_arg)
-    parser.add_argument('--group_name', required=False, help='Only process data related to group')
-    parser.add_argument('--combine', action='store_true', help='Should only create one bundle. setting to false will make separate bundle per group.')
+    parser.add_argument('--group_name', required=False, help='Only process data related to a specific group. Default is all.')
+    parser.add_argument('--combine', action='store_true', default=False, help='Should only create one bundle. setting to True will make separate bundle per group.')
     args: Args = parser.parse_args()
     return args
 
 
     
 def main(args: Args):
-    output_path = Path('stix2_output/ransomware2stix-bundle.json')
+    output_path = Path('stix2_objects/ransomware2stix-bundle.json')
     with contextlib.suppress(Exception):
         shutil.rmtree(output_path.parent)
     output_path.parent.mkdir(exist_ok=True, parents=True)
-    setLogFile(logging.root, Path(f"stix2_output/ransomware2stix-log.txt"))
+    setLogFile(logging.root, Path(f"stix2_objects/ransomware2stix-log.txt"))
 
     groups = Parser.parse_all_victims(args.min_discovered, args.max_discovered, groups=args.group_name and [args.group_name], combine_bundle=args.combine, write_fs=True)
     for group_name, parser in groups.items():

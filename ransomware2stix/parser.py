@@ -77,7 +77,8 @@ SECTOR_MAPPING = {
     "Consumer Services": "commercial",
     "Public Sector": "government-public-services",
     "Telecommunication": "telecommunications",
-    "Construction": "construction"
+    "Construction": "construction",
+    "Real Estate": "commercial"
 }
 
 TOOL_MAPPING = {
