@@ -107,6 +107,8 @@ class Parser:
         self.group_name = group_name
         if write_fs:
             fs_path = Path('outputs/stix2_objects')
+            if group_name:
+                fs_path = fs_path/group_name
             shutil.rmtree(fs_path, ignore_errors=True)
             fs_path.mkdir(parents=True, exist_ok=True)
             self._fs = FileSystemStore(stix_dir=fs_path, allow_custom=True)
