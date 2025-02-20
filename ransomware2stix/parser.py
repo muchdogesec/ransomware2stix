@@ -341,7 +341,7 @@ class Parser:
             created=parse_date(victim['attackdate']),
             modified=parse_date(victim['discovered']),
             name=f"{victim_name} ransomed by {group_name}",
-            description=f"url={victim['claim_url']}",
+            description=victim['claim_url'],
         )
         self.add_object(incident)
         try:
