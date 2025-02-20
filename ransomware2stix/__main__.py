@@ -67,15 +67,16 @@ def parse_args():
 
     
 def main(args: Args):
-    output_path = Path('stix2_objects/ransomware2stix-bundle.json')
+    output_path = Path('outputs/')
     with contextlib.suppress(Exception):
-        shutil.rmtree(output_path.parent)
-    output_path.parent.mkdir(exist_ok=True, parents=True)
-    setLogFile(logging.root, Path(f"stix2_objects/ransomware2stix-log.txt"))
+        shutil.rmtree(output_path)
+    bundles_path = output_path / "bundles"
+    bundles_path.mkdir(exist_ok=True, parents=True)
+    setLogFile(logging.root, Path("logs")/f"ransomware2stix-{(datetime.now().isoformat(timespec='seconds').replace(':', '-'))}.txt")
 
     groups = Parser.parse_all_victims(args.min_discovered, args.max_discovered, groups=args.group_name and [args.group_name], combine_bundle=args.combine, write_fs=True)
     for group_name, parser in groups.items():
-        path = output_path.with_name(f'ransomware2stix_bundle--{group_name}.json')
+        path = bundles_path / f'ransomware2stix_bundle--{group_name}.json'
         with open(path, 'w') as f:
             fp_serialize(parser.bundle, f, indent=4)
             logging.info(f"Wrote bundle output for `{group_name}` to `{path}`")
