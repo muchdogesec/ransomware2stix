@@ -450,21 +450,6 @@ UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `name`
 
 Sectors can be identified using `activity` value in response mapped to -> stix sector value
 
-* `Healthcare` -> `healthcare`
-* `Energy` -> `energy`
-* `Technology` -> `technology`
-* `Not Found` -> do not include sector property
-* `Business Services` -> `commercial`
-* `Eduction` -> `education`
-* `Construction` -> `construction`
-* `Manufacturing` -> `manufacturing`
-* `Agriculture and Food Production` -> `agriculture`
-* `Public Sector` -> `government-public-services`
-* `Government` -> `government`
-* `Transportation/Logistics` -> `transportation`
-* `Financial Services` -> `financial-services`
-* `Hospitality and Tourism` -> `hospitality-leisure`
-
 If other value returned for `activity` do not include sector property in Identity object.
 
 #### Location object
