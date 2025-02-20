@@ -4,7 +4,5 @@ __pycache__/
 .env
 .venv/
 logs/
-output/
 
-ransomware2stix-venv/
-stix2_objects/
+outputs/
