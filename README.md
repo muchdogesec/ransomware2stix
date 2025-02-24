@@ -4,24 +4,7 @@
 
 ![](docs/ransomware2stix.png)
 
-ransomware2stix turns intelligence on Ransomware Groups and their victims into STIX 2.1 objects.
-
-
-
-
-
-It was born from our frustration of various intelligence producers each naming the same ransomware ever-so-slightly differently.
-
-This project is heavily inspired by MITRE ATT&CK, aiming to fill the gap in MITRE ATT&CK for ransomware specific content. Where relevant, RansomwareKB also links back the MITRE ATT&CK framework with the ultimate goal to commit the data gathered here into MITRE ATT&CK.
-
-## Overview Structure of the data
-
-At present the following concepts are supported;
-
-1. Groups (STIX `intrusion-set` objects, ID in format `GXXXX`): that describe ransomware operators and groups.
-3. Tools (STIX `tool` objects, ID in format `TXXXX`): that describe the Tools used by ransomware operators and groups. This is not the Ransomware itself.
-4. Victims (STIX `tool` objects, ID in format `IXXXXXX`): victims infected by the ransomware
-
+ransomware2stix turns ransomware intelligence on [ransomware.live](https://ransomware.live/) into STIX 2.1 objects ([consider supporting the project](https://buymeacoffee.com/ransomwarelive)).
 
 ## Install
 
@@ -39,16 +22,60 @@ pip3 install -r requirements.txt
 ## Run
 
 ```shell
-python -m ransomware2stix
-
---min_discovered and --max_discovered
+python3 -m ransomware2stix \
+	--min_discovered YYYY-MM-DD \
+	--max_discovered YYYY-MM-DD \
+	--group_name STRING \
+	--combine BOOLEAN
 ```
 
+Where:
 
+* `min_discovered` (optional, `YYYY-MM-DD`): This allows you to filter the results to only include incidents after the date entered. Default is all time.
+* `max_discovered` (optional, `YYYY-MM-DD`): This allows you to filter the results to only include incidents before the date entered. Default is all time.
+* `group_name` (optional): Filter the output to only include a single ransomware group. Default is all.
+* `combine` (optional, boolean): The script will produce a bundle for each ransomware by dafault. Use this to create a single bundle output for all results.
 
-## Credits
+The default output of this script is structured as follows;
 
-* https://ransomware.live/
+```txt
+
+├── output
+│	├── bundles
+│   │	├── GROUP_1.json
+│	│	└── ...
+│   └── stix2_objects
+│   	├── GROUP_1
+│		└── ...
+...
+```
+
+### Examples
+
+Get data for all groups in January 2025:
+
+```shell
+python3 -m ransomware2stix \
+	--min_discovered 2025-01-01 \
+	--max_discovered 2025-01-31
+```
+
+Get all data for clop;
+
+```shell
+python3 -m ransomware2stix \
+	--group_name clop
+```
+
+Note, to get all group names you can use the following request;
+
+```shell
+curl -X 'GET' \
+  'https://api.ransomware.live/v2/groups' \
+  -H 'accept: application/json'
+```
+
+The `name` value in the response maps to `group_name` on the command line.
 
 ## Useful supporting tools
 
