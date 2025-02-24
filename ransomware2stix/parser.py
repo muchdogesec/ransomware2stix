@@ -337,12 +337,16 @@ class Parser:
                     )
                 )
         
+        incident_name = f"{victim_name} ransomed by {group_name}"
+        attack_date = parse_date(victim['attackdate'])
+        incident_id = str(uuid.uuid5(NAMESPACE, f"{incident_name}+{attack_date}"))
         incident = Incident(
+            id="incident--"+incident_id,
             object_marking_refs=self.OBJECT_MARKING_REFS,
             created_by_ref=self.CREATED_BY_REF,
-            created=parse_date(victim['attackdate']),
+            created=attack_date,
             modified=parse_date(victim['discovered']),
-            name=f"{victim_name} ransomed by {group_name}",
+            name=incident_name,
             description=victim['claim_url'],
         )
         self.add_object(incident)
@@ -350,7 +354,7 @@ class Parser:
             group = self.get_group(group_name)
             self.add_object(
                 Relationship(
-                    id="relationship--"+get_relationship_id(identity.id, group['id']),
+                    id="relationship--"+incident_id,
                     source_ref=identity.id,
                     target_ref=group['id'],
                     created=parse_date(victim['attackdate']),
