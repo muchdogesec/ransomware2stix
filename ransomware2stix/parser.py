@@ -309,7 +309,7 @@ class Parser:
             id="identity--" + str(uuid.uuid5(NAMESPACE, victim_name)),
             created_by_ref=self.CREATED_BY_REF,
             created="2020-01-01T00:00:00.000Z",
-            modified=parse_date(victim['discovered']),
+            modified="2020-01-01T00:00:00.000Z",
             name=victim_name,
             description=victim["description"],
             contact_information=victim["domain"],
@@ -361,8 +361,8 @@ class Parser:
                     modified=identity.modified,
                     object_marking_refs=identity.object_marking_refs,
                     created_by_ref=identity.created_by_ref,
-                    relationship_type="country",
-                    description=f"{identity.name} was a victom of {group['name']}",
+                    relationship_type="attributed-to",
+                    description=f"{group['name']} launch targetted {identity.name}",
                     allow_custom=True,
                 )
             )
