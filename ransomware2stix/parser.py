@@ -299,7 +299,7 @@ class Parser:
             victim=victim.get('victim', victim.get('post_title')),
         )
         group_name = victim['group']
-        victim_name = victim['victim']
+        victim_name = victim['victim'].lower()
 
         mapped_sector = SECTOR_MAPPING.get(victim['activity'])
         if victim['activity'] not in SECTOR_MAPPING:
