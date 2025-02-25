@@ -313,7 +313,7 @@ class Parser:
             modified="2020-01-01T00:00:00.000Z",
             name=victim_name,
             description=victim["description"],
-            contact_information=victim["domain"],
+            contact_information=victim["domain"].lower(),
             identity_class="organization",
             sectors=mapped_sector,
             object_marking_refs=self.OBJECT_MARKING_REFS
