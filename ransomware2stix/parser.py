@@ -10,6 +10,7 @@ import requests
 
 from ransomware2stix import retriever
 from stix2 import IntrusionSet, Relationship, Identity, Incident, Tool, AttackPattern, FileSystemStore
+from stix2.utils import format_datetime
 from datetime import datetime
 from stix2extensions.tools import crypto2stix
 
@@ -338,7 +339,7 @@ class Parser:
                 )
         
         incident_name = f"{victim_name} ransomed by {group_name}"
-        attack_date = parse_date(victim['attackdate'])
+        attack_date = format_datetime(parse_date(victim['attackdate']))
         incident_id = str(uuid.uuid5(NAMESPACE, f"{incident_name}+{attack_date}"))
         incident = Incident(
             id="incident--"+incident_id,
