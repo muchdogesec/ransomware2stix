@@ -21,8 +21,13 @@ def parse_date(date_string: str):
     return date_string and datetime.strptime(date_string, "%Y-%m-%d %H:%M:%S.%f")
 
 
-def get_relationship_id(source_ref, target_ref):
-        return str(uuid.uuid5(NAMESPACE, f"{source_ref}+{target_ref}"))
+def get_relationship_id(source_ref, target_ref, created=None):
+        id_part = f"{source_ref}+{target_ref}"
+        if isinstance(created, datetime):
+            id_part += "+"+format_datetime(created)
+        elif isinstance(created, str):
+            id_part += "+"+created
+        return str(uuid.uuid5(NAMESPACE, id_part))
 
 class GroupError(Exception):
     pass
@@ -355,11 +360,25 @@ class Parser:
             group = self.get_group(group_name)
             self.add_object(
                 Relationship(
-                    id="relationship--"+incident_id,
-                    source_ref=identity.id,
-                    target_ref=group['id'],
-                    created=parse_date(victim['attackdate']),
-                    modified=identity.modified,
+                    id="relationship--"+get_relationship_id(identity.id, group['id'], attack_date),
+                    target_ref=identity.id,
+                    source_ref=group['id'],
+                    created=attack_date,
+                    modified=incident.modified,
+                    object_marking_refs=identity.object_marking_refs,
+                    created_by_ref=identity.created_by_ref,
+                    relationship_type="victim",
+                    description=f"{identity.name} was a victim of {group['name']}",
+                    allow_custom=True,
+                )
+            )
+            self.add_object(
+                Relationship(
+                    id="relationship--"+get_relationship_id(incident.id, group['id'], attack_date),
+                    target_ref=incident.id,
+                    source_ref=group['id'],
+                    created=attack_date,
+                    modified=incident.modified,
                     object_marking_refs=identity.object_marking_refs,
                     created_by_ref=identity.created_by_ref,
                     relationship_type="attributed-to",
