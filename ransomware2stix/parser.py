@@ -331,7 +331,7 @@ class Parser:
                         modified=identity.modified,
                         object_marking_refs=identity.object_marking_refs,
                         created_by_ref=identity.created_by_ref,
-                        relationship_type="country",
+                        relationship_type="located-in",
                         description=f"{identity.name} is located in {victim['country']}",
                         allow_custom=True,
                     )

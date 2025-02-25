@@ -365,6 +365,8 @@ The object returned can then be imported and joined to the intrustion set object
 }
 ```
 
+UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`
+
 ### Bitcoin (ransomware.live)
 
 `btc_address` values are turned into bitcoin objects
@@ -468,7 +470,7 @@ The country is linked to the victim using a relationship object
   "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
   "created": "<identity created>",
   "modified": "<identity modified>",
-  "relationship_type": "country",
+  "relationship_type": "located-in",
   "description": "<identity name> is located in <location name>",
   "source_ref": "identity--<ID>",
   "target_ref": "location--<ID>",
@@ -499,6 +501,8 @@ UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref
   ]
 }
 ```
+
+UUIDv5 is generated from namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` and the value `<name>+<created>`, e.g. `datasite.com ransomed by clop+2023-06-14T20:18:16.322337Z`.
 
 An incident is linked to group using the `group` (above its `killsec`) and the victim
 
@@ -544,7 +548,7 @@ An incident is linked to victim using the `` (above its `killsec`) and the victi
 }
 ```
 
-UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`
+UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref+created`
 
 #### Tools
 
@@ -581,7 +585,7 @@ For these, an attack pattern is created...
 
 ```json
 {
-  "type": "attack-pattern",
+  "type": "x-mitre-tactic",
   "spec_version": "2.1",
   "id": "attack-pattern--<UUIDv5>",
   "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
@@ -592,7 +596,8 @@ For these, an attack pattern is created...
   "external_references": [
     {
       "source_name": "ransomware2stix",
-      "external_id": "ID"
+      "external_id": "ID",
+      "url": "https://github.com/muchdogesec/ransomware2stix"
     } 
   ],
   "x_mitre_shortname": "<slug>",
@@ -643,7 +648,7 @@ UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `name`
 * `Offsec` (T0005)
 * `RMM-Tools` (T0002)
 
-A tool is joined to an attack pattern object like so
+A tool is joined to an Tactic object like so
 
 ```json
 {
@@ -656,7 +661,7 @@ A tool is joined to an attack pattern object like so
   "relationship_type": "technique",
   "description": "<tool name> uses <technique name>",
   "source_ref": "tool--<ID>",
-  "target_ref": "attack-pattern--<ID>",
+  "target_ref": "x-mitre-tactic--<ID>",
   "object_marking_refs": [
       "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
       "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
