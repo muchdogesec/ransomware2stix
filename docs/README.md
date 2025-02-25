@@ -681,7 +681,7 @@ A tool is joined to an incident like so
   "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
   "created": "<tool created>",
   "modified": "<tool modified>",
-  "relationship_type": "technique",
+  "relationship_type": "used-in",
   "description": "<tool name> was used in incident",
   "source_ref": "tool--<ID>",
   "target_ref": "indicident--<ID>",
