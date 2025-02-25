@@ -9,7 +9,7 @@ import uuid
 import requests
 
 from ransomware2stix import retriever
-from stix2 import IntrusionSet, Relationship, Identity, Incident, Tool, AttackPattern, FileSystemStore
+from stix2 import IntrusionSet, Relationship, Identity, Incident, Tool, AttackPattern, FileSystemStore, Bundle
 from stix2.utils import format_datetime
 from datetime import datetime
 from stix2extensions.tools import crypto2stix
@@ -98,7 +98,7 @@ TOOL_MAPPING = {
     "RMM-Tools": ("exploitation", "T0002", "Remote Monitoring & Management Tools", "An RMM (Remote Monitoring and Management) tool is a type of software used by IT professionals and managed service providers (MSPs) to remotely monitor, manage, and maintain IT systems, networks, and devices. These tools are designed to improve the efficiency of IT operations by enabling technicians to handle tasks from a centralized location without the need for physical access to client devices."),
 }
 
-
+COMBINED_GROUP_NAME = "all-groups-combined"
 class Parser:
     _fs = None
     CREATED_BY_REF = "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
@@ -141,7 +141,7 @@ class Parser:
 
     @property
     def bundle(self):
-        return dict(type='bundle', id='bundle--'+str(uuid.uuid4()), objects=self.parsed_objects)
+        return Bundle(type='bundle', id='bundle--'+str(uuid.uuid4()), objects=self.parsed_objects, allow_custom=True)
 
     def parse_group(self, group):
         group_name = group['name']
@@ -411,7 +411,7 @@ class Parser:
         if not end_date:
             end_date = datetime.max
         for i, victim in enumerate(retriever.get_victims()):
-            discovered_on = parse_date(victim['discovered']).replace(hour=0, minute=0, second=0, microsecond=0)
+            discovered_on = parse_date(victim['discovered'])
             if discovered_on < start_date or discovered_on > end_date:
                 continue
 
@@ -423,7 +423,7 @@ class Parser:
                 if not parser:
                     parser = parsers.setdefault(group_name, Parser(write_fs=write_fs, group_name=group_name))
             else:
-                parser = parsers.setdefault("all-groups-combined", default_parser)
+                parser = parsers.setdefault(COMBINED_GROUP_NAME, default_parser)
             
             try:
                 parser.parse_victim(victim)

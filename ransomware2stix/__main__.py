@@ -62,6 +62,8 @@ def parse_args():
     parser.add_argument('--group_name', required=False, help='Only process data related to a specific group. Default is all.')
     parser.add_argument('--combine', action='store_true', default=False, help='Should only create one bundle. setting to True will make separate bundle per group.')
     args: Args = parser.parse_args()
+    if args.max_discovered:
+        args.max_discovered = args.max_discovered.replace(hour=23, minute=59, second=59, microsecond=999_999)
     return args
 
 
