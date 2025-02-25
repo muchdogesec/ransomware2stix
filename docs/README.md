@@ -658,7 +658,7 @@ A tool is joined to an Tactic object like so
   "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
   "created": "<tool created>",
   "modified": "<tool modified>",
-  "relationship_type": "technique",
+  "relationship_type": "uses-tactic",
   "description": "<tool name> uses <technique name>",
   "source_ref": "tool--<ID>",
   "target_ref": "x-mitre-tactic--<ID>",
@@ -671,7 +671,7 @@ A tool is joined to an Tactic object like so
 
 UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`
 
-A tool is joined to an incident like so
+A tool is joined to an group like so
 
 ```json
 {
@@ -681,15 +681,18 @@ A tool is joined to an incident like so
   "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
   "created": "<tool created>",
   "modified": "<tool modified>",
-  "relationship_type": "used-in",
-  "description": "<tool name> was used in incident",
-  "source_ref": "tool--<ID>",
-  "target_ref": "indicident--<ID>",
+  "relationship_type": "uses",
+  "description": "<group> uses <tool>",
+  "source_ref": "intrusion-set--<ID>",
+  "target_ref": "tool--<ID>",
   "object_marking_refs": [
       "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
       "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
   ]
 }
 ```
+
+UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`
+
 
 UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`

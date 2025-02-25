@@ -203,8 +203,8 @@ class Parser:
                         modified=tool.modified,
                         object_marking_refs=tool.object_marking_refs,
                         created_by_ref=tool.created_by_ref,
-                        relationship_type="uses",
-                        description=f"{tool.name} uses {attack_pattern.name}",
+                        relationship_type="uses-tactic",
+                        description=f"{tool.name} is used for {attack_pattern.name}",
                         allow_custom=True,
                     )
                 )
@@ -218,8 +218,8 @@ class Parser:
                         modified=tool.modified,
                         object_marking_refs=group_obj.object_marking_refs,
                         created_by_ref=group_obj.created_by_ref,
-                        relationship_type="technique",
-                        description=f"{group_obj.name} uses technique {tool.name}",
+                        relationship_type="uses",
+                        description=f"{group_obj.name} uses {tool.name}",
                         allow_custom=True,
                     )
                 )
