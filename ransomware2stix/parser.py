@@ -232,8 +232,9 @@ class Parser:
 
     def get_tool_attack_pattern(self, tool_name):
         tool_type, tool_id, name, description = TOOL_MAPPING[tool_name]
-        tool = AttackPattern(
-            id="attack-pattern--"+str(uuid.uuid5(NAMESPACE, name)),
+        tool = dict(
+            id="x-mitre-tactic--"+str(uuid.uuid5(NAMESPACE, name)),
+            type="x-mitre-tactic",
             created_by_ref=self.CREATED_BY_REF,
             created="2020-01-01T00:00:00.000Z",
             modified="2020-01-01T00:00:00.000Z",
@@ -242,12 +243,12 @@ class Parser:
             external_references=[
                 dict(
                     source_name="ransomware2stix",
-                    external_id=tool_id
+                    external_id=tool_id,
+                    url="https://github.com/muchdogesec/ransomware2stix",
                 )
             ],
             x_mitre_shortname=tool_name,
             object_marking_refs=self.OBJECT_MARKING_REFS,
-            allow_custom=True,
         )
         self.add_object(tool)
         return tool_type, tool
