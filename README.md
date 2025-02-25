@@ -6,6 +6,15 @@
 
 ransomware2stix turns ransomware intelligence on [ransomware.live](https://ransomware.live/) into STIX 2.1 objects ([consider supporting the project](https://buymeacoffee.com/ransomwarelive)).
 
+We build this because our tooling is stuctured in STIX 2.1 and we wanted to add ransomware.live data for additional context on our research.
+
+ransomware2stix supports:
+
+* MITRE ATT&CK tagging of ransomware groups
+* Tracking of crypto wallets linked to groups
+* Linking tools to groups (including support for the [Ransomware Tool Matrix](https://github.com/BushidoUK/Ransomware-Tool-Matrix))
+* Identification of ransomware victims with group attribution
+
 ## Install
 
 ```shell

@@ -338,6 +338,8 @@ For each entry, the following is created.
 }
 ```
 
+The UUID should be generated using namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` and the value `<name>+<created>`, e.g. `datasite.com ransomed by clop+2023-06-14T20:18:16.322337Z`.
+
 ### MITRE ATT&CK
 
 Using CTI Butler (user must enter creds in `.env`) the `ttp.techniques.technique_id` value can be looked up on the MITRE ATT&CK endpoint.
@@ -519,7 +521,7 @@ An incident is linked to group using the `group` (above its `killsec`) and the v
 }
 ```
 
-UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`
+UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref+created`
 
 An incident is linked to victim using the `` (above its `killsec`) and the victim
 
