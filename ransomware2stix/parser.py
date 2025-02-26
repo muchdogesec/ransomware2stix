@@ -361,7 +361,7 @@ class Parser:
             group = self.get_group(group_name)
             self.add_object(
                 Relationship(
-                    id="relationship--"+get_relationship_id(identity.id, group['id'], attack_date),
+                    id="relationship--"+get_relationship_id(group['id'], identity.id, attack_date),
                     target_ref=identity.id,
                     source_ref=group['id'],
                     created=attack_date,
@@ -375,7 +375,7 @@ class Parser:
             )
             self.add_object(
                 Relationship(
-                    id="relationship--"+get_relationship_id(incident.id, group['id'], attack_date),
+                    id="relationship--"+get_relationship_id(group['id'], incident.id, attack_date),
                     target_ref=incident.id,
                     source_ref=group['id'],
                     created=attack_date,
