@@ -181,7 +181,7 @@ class Parser:
         if not tools:
             return
         for attack_type, tool_names in tools[0].items():
-            tool_type, attack_pattern = self.get_tool_attack_pattern(attack_type)
+            tool_type, tactic_obj = self.get_tool_attack_pattern(attack_type)
             for tool_name in tool_names:
                 tool = Tool(
                     id="tool--"+str(uuid.uuid5(NAMESPACE, tool_name)),
@@ -193,7 +193,7 @@ class Parser:
                     kill_chain_phases=[
                         dict(
                             kill_chain_name="ransomware2stix",
-                            phase_name=attack_pattern.x_mitre_shortname,
+                            phase_name=tactic_obj["x_mitre_shortname"],
                         )
                     ],
                     object_marking_refs=self.OBJECT_MARKING_REFS,
@@ -202,15 +202,15 @@ class Parser:
                 self.add_object(tool)
                 self.add_object(
                     Relationship(
-                        id="relationship--"+get_relationship_id(tool.id, attack_pattern['id']),
+                        id="relationship--"+get_relationship_id(tool.id, tactic_obj['id']),
                         source_ref=tool.id,
-                        target_ref=attack_pattern['id'],
+                        target_ref=tactic_obj['id'],
                         created=tool.created,
                         modified=tool.modified,
                         object_marking_refs=tool.object_marking_refs,
                         created_by_ref=tool.created_by_ref,
                         relationship_type="uses-tactic",
-                        description=f"{tool.name} is used for {attack_pattern.name}",
+                        description=f"{tool.name} is used for {tactic_obj['name']}",
                         allow_custom=True,
                     )
                 )
