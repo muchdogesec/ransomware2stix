@@ -10,15 +10,15 @@ import requests
 
 from ransomware2stix import retriever
 from stix2 import IntrusionSet, Relationship, Identity, Incident, Tool, AttackPattern, FileSystemStore, Bundle
-from stix2.utils import format_datetime
+from stix2.utils import format_datetime, STIXdatetime, Precision
 from datetime import datetime
 from stix2extensions.tools import crypto2stix
 
 NAMESPACE = uuid.UUID("7bae962c-40ae-5817-8cdc-e1b6eb4f38f5")
-DEFAULT_DATE = datetime(1970, 1, 1)
+DEFAULT_DATE = datetime(2020, 1, 1)
 
 def parse_date(date_string: str):
-    return date_string and datetime.strptime(date_string, "%Y-%m-%d %H:%M:%S.%f")
+    return date_string and STIXdatetime(datetime.strptime(date_string, "%Y-%m-%d %H:%M:%S.%f"), precision=Precision.MILLISECOND)
 
 
 def get_relationship_id(source_ref, target_ref, created=None):
@@ -152,6 +152,7 @@ class Parser:
             slugs.append(dict(source_name='darkweb_site', url=location['slug']))
         group['locations'] = sorted(group['locations'], key=lambda x: x['updated'] or datetime.min, reverse=True)
         obj =  IntrusionSet(
+            id="intrusion-set--"+str(uuid.uuid5(NAMESPACE, group_name)),
             created=DEFAULT_DATE, #we can';t have this changing because then s2a would always upload new items every time we upload
             modified=group['locations'] and group['locations'][0]['updated'],
             name=group_name,
