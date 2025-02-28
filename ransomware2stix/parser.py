@@ -210,7 +210,7 @@ class Parser:
                         modified=tool.modified,
                         object_marking_refs=tool.object_marking_refs,
                         created_by_ref=tool.created_by_ref,
-                        relationship_type="uses-tactic",
+                        relationship_type="uses",
                         description=f"{tool.name} is used for {tactic_obj['name']}",
                         allow_custom=True,
                     )
@@ -369,7 +369,7 @@ class Parser:
                     modified=incident.modified,
                     object_marking_refs=identity.object_marking_refs,
                     created_by_ref=identity.created_by_ref,
-                    relationship_type="victim",
+                    relationship_type="victim-of",
                     description=f"{identity.name} was a victim of {group['name']}",
                     allow_custom=True,
                 )
