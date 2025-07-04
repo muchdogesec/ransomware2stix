@@ -12,7 +12,7 @@ python-arango==8.1.4
 python-dotenv==1.0.1
 pytz==2024.2
 referencing==0.36.2
-requests==2.32.3
+requests==2.32.4
 requests-toolbelt==1.0.0
 rpds-py==0.22.3
 setuptools==75.8.0
