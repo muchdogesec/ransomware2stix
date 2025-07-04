@@ -15,7 +15,7 @@ referencing==0.36.2
 requests==2.32.3
 requests-toolbelt==1.0.0
 rpds-py==0.22.3
-setuptools==75.8.0
+setuptools==78.1.1
 simplejson==3.19.3
 six==1.17.0
 stix2==3.0.1
