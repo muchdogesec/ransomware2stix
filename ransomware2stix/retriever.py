@@ -1,4 +1,5 @@
 from functools import lru_cache
+import json
 import logging
 import os
 from urllib.parse import urljoin
@@ -10,14 +11,13 @@ DEFAULT_OBJECT_URLS = [
     "https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/ransomware2stix.json",
 ]
 
-#####
-def get_groups():
-    r = requests.get('https://api.ransomware.live/v1/groups')
-    return {group['name']: group for group in r.json()}
 
 def get_victims():
     resp = requests.get('https://data.ransomware.live/victims.json')
     return resp.json()
+
+# def get_victims():
+#     return json.loads(open('victims.json').read())
 
 @lru_cache
 def get_default_objects():

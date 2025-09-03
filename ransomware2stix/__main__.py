@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import logging
 import shutil
+import sys
 from stix2 import Identity
 from dotenv import load_dotenv
 from stix2.serialization import fp_serialize
@@ -67,8 +68,8 @@ def parse_args():
     return args
 
 
-    
 def main(args: Args):
+    
     output_path = Path('outputs/')
     with contextlib.suppress(Exception):
         shutil.rmtree(output_path)
@@ -84,4 +85,5 @@ def main(args: Args):
             logging.info(f"Wrote bundle output for `{group_name}` to `{path}`")
 
 if __name__ == '__main__':
+    # sys.argv = ['/home/fqrious/dev/dogesec/ransomware2stix/ransomware2stix/__main__.py', '--group_name', 'akira']
     main(parse_args())
