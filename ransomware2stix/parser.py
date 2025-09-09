@@ -27,7 +27,7 @@ from stix2extensions.tools import crypto2stix
 NAMESPACE = uuid.UUID("7bae962c-40ae-5817-8cdc-e1b6eb4f38f5")
 DEFAULT_DATE = datetime(2020, 1, 1)
 
-RANSOMWARE_LIVE_API_KEY = os.environ['RANSOMWARE_LIVE_API_KEY']
+RANSOMWARE_LIVE_API_KEY = os.environ["RANSOMWARE_LIVE_API_KEY"]
 
 
 def parse_date(date_string: str):
@@ -186,7 +186,7 @@ class Parser:
             location["country"]: location
             for location in retriever.get_location_objects()
         }
-        self.add_object(retriever.get_default_objects())
+        self.add_objects(retriever.get_default_objects())
         if not self.valid_groups:
             self.valid_groups = self.get_groups()
 
@@ -202,10 +202,10 @@ class Parser:
                 groups[group_name].update(iocs=ioc)
         return groups
 
-    def add_object(self, object):
+    def add_objects(self, object):
         if isinstance(object, list):
             for obj in object:
-                self.add_object(obj)
+                self.add_objects(obj)
             return
         if object["id"] in self.__added_objects:
             return
@@ -238,7 +238,9 @@ class Parser:
         )
         obj = IntrusionSet(
             id="intrusion-set--" + str(uuid.uuid5(NAMESPACE, group_name)),
-            created=parse_date(group['firstseen']),  # we can';t have this changing because then s2a would always upload new items every time we upload
+            created=parse_date(
+                group["firstseen"]
+            ),
             modified=group["locations"] and group["locations"][0]["updated"],
             name=group_name,
             description=group.get("description"),
@@ -253,27 +255,60 @@ class Parser:
             + slugs,
         )
         ttp_objects = self.parse_ttp(obj, group["ttps"])
+        vulnerability_objects = self.parse_vulnerabilities(
+            obj, group["vulnerabilities"]
+        )
         ioc_objects = self.parse_group_iocs(obj)
         self.__parsed_groups[group_name] = obj
-        self.add_object(obj)
-        self.add_object(ioc_objects)
-        self.add_object(ttp_objects)
+        self.add_objects(obj)
+        self.add_objects(ioc_objects)
+        self.add_objects(ttp_objects)
+        self.add_objects(vulnerability_objects)
         self.parse_tools(obj, group["tools"])
         return obj
-    
+
+    def parse_vulnerabilities(self, group_obj, vulnerabilities):
+        cve_ids = {cve["CVE"] for cve in vulnerabilities}
+        objects = []
+        for cve in retriever.get_vulnerability_objects(cve_ids):
+            cve_ids.difference_update([cve["name"]])
+            objects.append(cve)
+            objects.append(
+                Relationship(
+                    id="relationship--"
+                    + get_relationship_id(group_obj["id"], cve["id"]),
+                    source_ref=group_obj["id"],
+                    target_ref=cve["id"],
+                    created=group_obj["created"],
+                    modified=group_obj["modified"],
+                    object_marking_refs=group_obj["object_marking_refs"],
+                    created_by_ref=group_obj["created_by_ref"],
+                    relationship_type="exploits",
+                    description=f"{group_obj['name']} exploits {cve['name']}",
+                    allow_custom=True,
+                )
+            )
+        if cve_ids:
+            logging.warning(
+                f"failed to retrieve vulnerability objects for {len(cve_ids)} item(s). {cve_ids}"
+            )
+        return objects
+
     def parse_group_iocs(self, group_object):
-        group = self.valid_groups.get(group_object['name'])
+        group = self.valid_groups.get(group_object["name"])
         if not group:
             return []
-        ioc_stat = group.get('iocs')
+        ioc_stat = group.get("iocs")
         if not ioc_stat:
             return []
         objects = []
-        resp = self.session.get(f"https://api-pro.ransomware.live/iocs/{ioc_stat['group']}")
+        resp = self.session.get(
+            f"https://api-pro.ransomware.live/iocs/{ioc_stat['group']}"
+        )
         resp.raise_for_status()
-        iocs = resp.json()['iocs']
-        if ioc_stat['ioc_types'].get('btc', 0) > 0:
-            addresses = iocs['btc']
+        iocs = resp.json()["iocs"]
+        if ioc_stat["ioc_types"].get("btc", 0) > 0:
+            addresses = iocs["btc"]
             wallet_objects = self.parse_addresses(group_object, addresses)
             objects.extend(wallet_objects)
         return objects
@@ -300,8 +335,8 @@ class Parser:
                     object_marking_refs=self.OBJECT_MARKING_REFS,
                     allow_custom=True,
                 )
-                self.add_object(tool)
-                self.add_object(
+                self.add_objects(tool)
+                self.add_objects(
                     Relationship(
                         id="relationship--"
                         + get_relationship_id(tool.id, tactic_obj["id"]),
@@ -316,8 +351,7 @@ class Parser:
                         allow_custom=True,
                     )
                 )
-
-                self.add_object(
+                self.add_objects(
                     Relationship(
                         id="relationship--"
                         + get_relationship_id(group_obj.id, tool["id"]),
@@ -353,7 +387,7 @@ class Parser:
             x_mitre_shortname=tool_name,
             object_marking_refs=self.OBJECT_MARKING_REFS,
         )
-        self.add_object(tool)
+        self.add_objects(tool)
         return tool_type, tool
 
     def parse_addresses(self, group_object, btc_addresses):
@@ -386,7 +420,7 @@ class Parser:
         relationship_objects = []
         for obj in attack_objects:
             attack_id = obj["external_references"][0]["external_id"]
-            detail = techniques[attack_id]['technique_details']
+            detail = techniques[attack_id]["technique_details"]
             relationship_objects.append(
                 Relationship(
                     id="relationship--"
@@ -435,12 +469,12 @@ class Parser:
             sectors=mapped_sector,
             object_marking_refs=self.OBJECT_MARKING_REFS,
         )
-        self.add_object(identity)
+        self.add_objects(identity)
 
         location = self.locations.get(victim["country"])
         if location:
-            self.add_object(location)
-            self.add_object(
+            self.add_objects(location)
+            self.add_objects(
                 Relationship(
                     id="relationship--"
                     + get_relationship_id(identity.id, location["id"]),
@@ -468,10 +502,10 @@ class Parser:
             name=incident_name,
             description=victim["claim_url"],
         )
-        self.add_object(incident)
+        self.add_objects(incident)
         try:
             group = self.get_group(group_name)
-            self.add_object(
+            self.add_objects(
                 Relationship(
                     id="relationship--"
                     + get_relationship_id(group["id"], identity.id, attack_date),
@@ -486,7 +520,7 @@ class Parser:
                     allow_custom=True,
                 )
             )
-            self.add_object(
+            self.add_objects(
                 Relationship(
                     id="relationship--"
                     + get_relationship_id(group["id"], incident.id, attack_date),
