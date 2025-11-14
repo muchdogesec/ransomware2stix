@@ -23,4 +23,4 @@ stix2-patterns==2.0.0
 tqdm==4.67.1
 urllib3==2.5.0
 zipp==3.21.0
-stix2extensions @ https://github.com/muchdogesec/stix2extensions/releases/download/main-2024-11-29-08-23-28/stix2extensions-0.0.2b1-py3-none-any.whl#sha256=d2e6ec8682fd175fca91eae472b120810260ea0a4737849572c2d5e69ffdefd3
+stix2extensions==2.0.0
