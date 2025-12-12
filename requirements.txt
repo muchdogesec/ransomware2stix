@@ -21,6 +21,6 @@ six==1.17.0
 stix2==3.0.1
 stix2-patterns==2.0.0
 tqdm==4.67.1
-urllib3==2.5.0
+urllib3==2.6.0
 zipp==3.21.0
 stix2extensions==2.0.0
