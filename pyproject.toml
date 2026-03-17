@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ransomware2stix"
-version = "0.0.3"
+version = "0.0.4"
 authors = [
   { name="DOGESEC", email="support@dogesec.com" },
 ]
