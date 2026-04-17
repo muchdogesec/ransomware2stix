@@ -1,13 +1,10 @@
-import contextlib
-import itertools
 import logging
 import os
-from pathlib import Path
-import shutil
 import uuid
 from dateutil.parser import parse as dateutitl_parse_date
 
 import requests
+import stix2
 
 from ransomware2stix import retriever
 from stix2 import (
@@ -16,8 +13,6 @@ from stix2 import (
     Identity,
     Incident,
     Tool,
-    AttackPattern,
-    FileSystemStore,
     Bundle,
 )
 from stix2.utils import format_datetime, STIXdatetime, Precision
@@ -27,7 +22,7 @@ from stix2extensions.tools import crypto2stix
 NAMESPACE = uuid.UUID("7bae962c-40ae-5817-8cdc-e1b6eb4f38f5")
 DEFAULT_DATE = datetime(2020, 1, 1)
 
-RANSOMWARE_LIVE_API_KEY = os.environ['RANSOMWARE_LIVE_API_KEY']
+RANSOMWARE_LIVE_API_KEY = os.environ["RANSOMWARE_LIVE_API_KEY"]
 
 
 def parse_date(date_string: str):
@@ -168,44 +163,36 @@ class Parser:
     ]
     valid_groups = None
 
-    def __init__(self, write_fs=False, group_name=None):
+    def __init__(self, start_date=None, end_date=None):
         self.__parsed_groups = {}
         self.__parsed_objects = []
         self.__added_objects = set()
-        self.group_name = group_name
+        self.start_date = start_date
+        self.end_date = end_date
         self.session = requests.Session()
         self.session.headers = {"X-API-KEY": RANSOMWARE_LIVE_API_KEY}
-        if write_fs:
-            fs_path = Path("outputs/stix2_objects")
-            if group_name:
-                fs_path = fs_path / group_name
-            shutil.rmtree(fs_path, ignore_errors=True)
-            fs_path.mkdir(parents=True, exist_ok=True)
-            self._fs = FileSystemStore(stix_dir=fs_path, allow_custom=True)
+
         self.locations = {
             location["country"]: location
             for location in retriever.get_location_objects()
         }
-        self.add_object(retriever.get_default_objects())
-        if not self.valid_groups:
-            self.valid_groups = self.get_groups()
+        self.ioc_stats = self.get_ioc_stats()
+
+    def get_ioc_stats(self):
+        r = self.session.get("https://api-pro.ransomware.live/iocs")
+        return {ioc_stat["group"].lower(): ioc_stat for ioc_stat in r.json()["groups"]}
 
     def get_groups(self):
         r = self.session.get("https://api-pro.ransomware.live/groups")
         groups: dict[str, dict] = {
             group["group"]: group for group in r.json()["groups"]
         }
-        r2 = self.session.get("https://api-pro.ransomware.live/iocs")
-        for ioc in r2.json()["groups"]:
-            group_name = ioc["group"].lower()
-            with contextlib.suppress(KeyError):
-                groups[group_name].update(iocs=ioc)
         return groups
 
-    def add_object(self, object):
+    def add_objects(self, object):
         if isinstance(object, list):
             for obj in object:
-                self.add_object(obj)
+                self.add_objects(obj)
             return
         if object["id"] in self.__added_objects:
             return
@@ -226,6 +213,14 @@ class Parser:
             allow_custom=True,
         )
 
+    def build_group_bundle(self, group):
+        self.add_objects(retriever.get_default_objects())
+        group_data = self.get_group(group["group"])
+        if group["altname"]:
+            group_data["aliases"] = [group["altname"]]
+        self.parse_group(group_data)
+        return self.__parsed_objects
+
     def parse_group(self, group):
         group_name = group["group"]
         slugs = []
@@ -238,7 +233,7 @@ class Parser:
         )
         obj = IntrusionSet(
             id="intrusion-set--" + str(uuid.uuid5(NAMESPACE, group_name)),
-            created=parse_date(group['firstseen']),  # we can';t have this changing because then s2a would always upload new items every time we upload
+            created=parse_date(group["firstseen"]),
             modified=group["locations"] and group["locations"][0]["updated"],
             name=group_name,
             description=group.get("description"),
@@ -253,29 +248,145 @@ class Parser:
             + slugs,
         )
         ttp_objects = self.parse_ttp(obj, group["ttps"])
-        ioc_objects = self.parse_group_iocs(obj)
+        vulnerability_objects = self.parse_vulnerabilities(
+            obj, group["vulnerabilities"]
+        )
+        ioc_objects = self.parse_group_iocs(obj, group)
         self.__parsed_groups[group_name] = obj
-        self.add_object(obj)
-        self.add_object(ioc_objects)
-        self.add_object(ttp_objects)
+        self.add_objects(obj)
+        self.add_objects(ioc_objects)
+        self.add_objects(ttp_objects)
+        self.add_objects(vulnerability_objects)
         self.parse_tools(obj, group["tools"])
+        if group["victims"]:
+            self.fetch_and_parse_victims(obj, group)
         return obj
-    
-    def parse_group_iocs(self, group_object):
-        group = self.valid_groups.get(group_object['name'])
-        if not group:
+
+    def parse_vulnerabilities(self, group_obj, vulnerabilities):
+        cve_ids = {cve["CVE"] for cve in vulnerabilities}
+        if not cve_ids:
             return []
-        ioc_stat = group.get('iocs')
-        if not ioc_stat:
+        orig_len = len(cve_ids)
+        objects = []
+        for cve in retriever.get_vulnerability_objects(cve_ids):
+            cve_ids.difference_update([cve["name"]])
+            objects.append(cve)
+            objects.append(
+                Relationship(
+                    id="relationship--"
+                    + get_relationship_id(group_obj["id"], cve["id"]),
+                    source_ref=group_obj["id"],
+                    target_ref=cve["id"],
+                    created=group_obj["created"],
+                    modified=group_obj["modified"],
+                    object_marking_refs=group_obj["object_marking_refs"],
+                    created_by_ref=group_obj["created_by_ref"],
+                    relationship_type="exploits",
+                    description=f"{group_obj['name']} exploits {cve['name']}",
+                    allow_custom=True,
+                )
+            )
+        if cve_ids:
+            logging.warning(
+                f"Found {orig_len - len(cve_ids)} out of {orig_len} CVEs. Missing: {cve_ids}"
+            )
+        return objects
+
+    def parse_group_iocs(self, group_object, group_data):
+        group_name = group_data["group"]
+        if not self.ioc_stats.get(group_name.lower()):
             return []
         objects = []
-        resp = self.session.get(f"https://api-pro.ransomware.live/iocs/{ioc_stat['group']}")
+        resp = self.session.get(
+            f"https://api-pro.ransomware.live/iocs/{group_data['group']}"
+        )
         resp.raise_for_status()
-        iocs = resp.json()['iocs']
-        if ioc_stat['ioc_types'].get('btc', 0) > 0:
-            addresses = iocs['btc']
-            wallet_objects = self.parse_addresses(group_object, addresses)
-            objects.extend(wallet_objects)
+        iocs = resp.json()["iocs"]
+        for ioc_type, ioc_values in iocs.items():
+            match ioc_type:
+                case "btc":
+                    wallet_objects = self.parse_addresses(group_object, ioc_values)
+                    objects.extend(wallet_objects)
+                case 'sha256'|'sha-256':
+                    objects.extend(self.parse_hashes(group_object, "SHA-256", ioc_values))
+                case 'sha1' | 'sha-1':
+                    objects.extend(self.parse_hashes(group_object, "SHA-1", ioc_values))
+                case 'md5':
+                    objects.extend(self.parse_hashes(group_object, "MD5", ioc_values))
+                case 'url' | 'ftp':
+                    for url in ioc_values:
+                        url_object = stix2.URL(
+                            value=url,
+                        )
+                        objects.append(url_object)
+                        objects.append(
+                            Relationship(
+                                id="relationship--"
+                                + get_relationship_id(group_object.id, url_object["id"]),
+                                source_ref=group_object.id,
+                                target_ref=url_object["id"],
+                                created=group_object.created,
+                                modified=group_object.modified,
+                                object_marking_refs=group_object.object_marking_refs,
+                                created_by_ref=group_object.created_by_ref,
+                                relationship_type="uses",
+                                description=f"{group_object.name} uses {url}",
+                                allow_custom=True,
+                                external_references=[
+                                    dict(
+                                        source_name="url_type",
+                                        external_id=ioc_type,
+                                    )
+                                ]
+                            )
+                        )
+                case 'email':
+                    for email in ioc_values:
+                        email_object = stix2.EmailAddress(
+                            value=email,
+                        )
+                        objects.append(email_object)
+                        objects.append(
+                            Relationship(
+                                id="relationship--"
+                                + get_relationship_id(group_object.id, email_object["id"]),
+                                source_ref=group_object.id,
+                                target_ref=email_object["id"],
+                                created=group_object.created,
+                                modified=group_object.modified,
+                                object_marking_refs=group_object.object_marking_refs,
+                                created_by_ref=group_object.created_by_ref,
+                                relationship_type="uses",
+                                description=f"{group_object.name} uses {email}",
+                                allow_custom=True,
+                            )
+                        )
+                case '_':
+                    logging.warning(f"unrecognized ioc type for group {group_name}: {ioc_type}")
+        return objects
+    
+    def parse_hashes(self, group_object, hash_type, hashes):
+        objects = []
+        for hash in hashes:
+            file_object = stix2.File(
+                hashes={hash_type: hash},
+            )
+            objects.append(file_object)
+            objects.append(
+                Relationship(
+                    id="relationship--"
+                    + get_relationship_id(group_object.id, file_object["id"]),
+                    source_ref=group_object.id,
+                    target_ref=file_object["id"],
+                    created=group_object.created,
+                    modified=group_object.modified,
+                    object_marking_refs=group_object.object_marking_refs,
+                    created_by_ref=group_object.created_by_ref,
+                    relationship_type="uses",
+                    description=f"{group_object.name} uses file with {hash_type}: {hash}",
+                    allow_custom=True,
+                )
+            )
         return objects
 
     def parse_tools(self, group_obj, tools):
@@ -300,8 +411,8 @@ class Parser:
                     object_marking_refs=self.OBJECT_MARKING_REFS,
                     allow_custom=True,
                 )
-                self.add_object(tool)
-                self.add_object(
+                self.add_objects(tool)
+                self.add_objects(
                     Relationship(
                         id="relationship--"
                         + get_relationship_id(tool.id, tactic_obj["id"]),
@@ -316,8 +427,7 @@ class Parser:
                         allow_custom=True,
                     )
                 )
-
-                self.add_object(
+                self.add_objects(
                     Relationship(
                         id="relationship--"
                         + get_relationship_id(group_obj.id, tool["id"]),
@@ -353,7 +463,7 @@ class Parser:
             x_mitre_shortname=tool_name,
             object_marking_refs=self.OBJECT_MARKING_REFS,
         )
-        self.add_object(tool)
+        self.add_objects(tool)
         return tool_type, tool
 
     def parse_addresses(self, group_object, btc_addresses):
@@ -386,7 +496,9 @@ class Parser:
         relationship_objects = []
         for obj in attack_objects:
             attack_id = obj["external_references"][0]["external_id"]
-            detail = techniques[attack_id]['technique_details']
+            detail = techniques[attack_id].get("technique_details", "")
+            if detail:
+                detail = " [" + detail + "]"
             relationship_objects.append(
                 Relationship(
                     id="relationship--"
@@ -398,13 +510,13 @@ class Parser:
                     object_marking_refs=group_object.object_marking_refs,
                     created_by_ref=group_object.created_by_ref,
                     relationship_type="uses",
-                    description=f"{group_object.name} uses {attack_id} [{detail}]",
+                    description=f"{group_object.name} uses {attack_id}{detail}",
                     allow_custom=True,
                 )
             )
         return attack_objects + relationship_objects
 
-    def parse_victim(self, victim):
+    def parse_victim(self, group_obj, victim):
         victim.update(
             group=victim.get("group", victim.get("group_name")),
             attackdate=victim.get("attackdate", victim.get("published")),
@@ -414,6 +526,13 @@ class Parser:
         )
         group_name = victim["group"]
         victim_name = victim["victim"].lower()
+
+        modified_date = parse_date(victim["discovered"])
+        attack_date = parse_date(victim["attackdate"]) or modified_date
+        if (self.start_date and max(attack_date, modified_date) < self.start_date) or (
+            self.end_date and max(attack_date, modified_date) > self.end_date
+        ):
+            return
 
         mapped_sector = SECTOR_MAPPING.get(victim["activity"])
         if victim["activity"] not in SECTOR_MAPPING:
@@ -435,12 +554,12 @@ class Parser:
             sectors=mapped_sector,
             object_marking_refs=self.OBJECT_MARKING_REFS,
         )
-        self.add_object(identity)
+        self.add_objects(identity)
 
         location = self.locations.get(victim["country"])
         if location:
-            self.add_object(location)
-            self.add_object(
+            self.add_objects(location)
+            self.add_objects(
                 Relationship(
                     id="relationship--"
                     + get_relationship_id(identity.id, location["id"]),
@@ -457,99 +576,66 @@ class Parser:
             )
 
         incident_name = f"{victim_name} ransomed by {group_name}"
-        attack_date = format_datetime(parse_date(victim["attackdate"]))
-        incident_id = str(uuid.uuid5(NAMESPACE, f"{incident_name}+{attack_date}"))
+        claim_url = victim["claim_url"]
+        incident_id = str(uuid.uuid5(NAMESPACE, f"{incident_name}+{claim_url}"))
         incident = Incident(
             id="incident--" + incident_id,
             object_marking_refs=self.OBJECT_MARKING_REFS,
             created_by_ref=self.CREATED_BY_REF,
             created=attack_date,
-            modified=parse_date(victim["discovered"]),
+            modified=modified_date,
             name=incident_name,
             description=victim["claim_url"],
+            external_references=[
+                {"source_name": "ransomware.live", "url": victim["permalink"]},
+            ],
         )
-        self.add_object(incident)
-        try:
-            group = self.get_group(group_name)
-            self.add_object(
-                Relationship(
-                    id="relationship--"
-                    + get_relationship_id(group["id"], identity.id, attack_date),
-                    target_ref=identity.id,
-                    source_ref=group["id"],
-                    created=attack_date,
-                    modified=incident.modified,
-                    object_marking_refs=identity.object_marking_refs,
-                    created_by_ref=identity.created_by_ref,
-                    relationship_type="victim-of",
-                    description=f"{identity.name} was a victim of {group['name']}",
-                    allow_custom=True,
-                )
+        self.add_objects(incident)
+        self.add_objects(
+            Relationship(
+                id="relationship--"
+                + get_relationship_id(group_obj["id"], identity.id, attack_date),
+                target_ref=identity.id,
+                source_ref=group_obj["id"],
+                created=attack_date,
+                modified=incident.modified,
+                object_marking_refs=identity.object_marking_refs,
+                created_by_ref=identity.created_by_ref,
+                relationship_type="victim-of",
+                description=f"{identity.name} was a victim of {group_obj['name']}",
+                allow_custom=True,
             )
-            self.add_object(
-                Relationship(
-                    id="relationship--"
-                    + get_relationship_id(group["id"], incident.id, attack_date),
-                    target_ref=incident.id,
-                    source_ref=group["id"],
-                    created=attack_date,
-                    modified=incident.modified,
-                    object_marking_refs=identity.object_marking_refs,
-                    created_by_ref=identity.created_by_ref,
-                    relationship_type="attributed-to",
-                    description=f"{group['name']} launch targetted {identity.name}",
-                    allow_custom=True,
-                )
+        )
+        self.add_objects(
+            Relationship(
+                id="relationship--"
+                + get_relationship_id(group_obj["id"], incident.id, attack_date),
+                target_ref=incident.id,
+                source_ref=group_obj["id"],
+                created=attack_date,
+                modified=incident.modified,
+                object_marking_refs=identity.object_marking_refs,
+                created_by_ref=identity.created_by_ref,
+                relationship_type="attributed-to",
+                description=f"{group_obj['name']} launch targetted {identity.name}",
+                allow_custom=True,
             )
-        except Exception as e:
-            logging.debug(f"failed to get group {group_name}: {e}", exc_info=True)
+        )
         return identity
 
     def get_group(self, group_name):
-        if group_name not in self.valid_groups:
-            raise GroupError(f"skip fetching group")
         if group_name in self.__parsed_groups:
             return self.__parsed_groups[group_name]
         url = f"https://api-pro.ransomware.live/groups/{group_name}"
         resp = self.session.get(url)
         resp_data = resp.json()
-        return self.parse_group(resp_data)
+        return resp_data
 
-    @classmethod
-    def parse_all_victims(
-        cls,
-        start_date=None,
-        end_date=None,
-        combine_bundle=False,
-        groups=[],
-        write_fs=False,
-    ):
-        parsers: dict[str, Parser] = {}
-        if combine_bundle:
-            default_parser = Parser(write_fs=write_fs)
-        if not start_date:
-            start_date = datetime.min
-        if not end_date:
-            end_date = datetime.max
-        for i, victim in enumerate(retriever.get_victims()):
-            discovered_on = parse_date(victim["discovered"])
-            if discovered_on < start_date or discovered_on > end_date:
-                continue
-
-            group_name = victim.get("group", victim.get("group_name"))
-            if groups and group_name not in groups:
-                continue
-            if not combine_bundle:
-                parser = parsers.get(group_name)
-                if not parser:
-                    parser = parsers.setdefault(
-                        group_name, Parser(write_fs=write_fs, group_name=group_name)
-                    )
-            else:
-                parser = parsers.setdefault(COMBINED_GROUP_NAME, default_parser)
-
-            try:
-                parser.parse_victim(victim)
-            except Exception as e:
-                logging.exception(f"failed on [{i}] - {victim}")
-        return parsers
+    def fetch_and_parse_victims(self, group_obj, group_data):
+        group_name = group_data["group"]
+        resp = self.session.get(
+            f"https://api-pro.ransomware.live/victims/?group={group_name}"
+        )
+        resp.raise_for_status()
+        for victim in resp.json()["victims"]:
+            self.parse_victim(group_obj, victim)

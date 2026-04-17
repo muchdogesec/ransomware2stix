@@ -502,7 +502,7 @@ UUIDv5 namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref
 }
 ```
 
-UUIDv5 is generated from namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` and the value `<name>+<created>`, e.g. `datasite.com ransomed by clop+2023-06-14T20:18:16.322337Z`.
+UUIDv5 is generated from namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` and the value `<name>+<claim_url>`, e.g. `datasite.com ransomed by 0mega+http://0mega.cc/post/6.html`.
 
 An incident is linked to group using the `group` (above its `killsec`) and the victim
 
