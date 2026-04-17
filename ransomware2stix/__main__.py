@@ -109,10 +109,11 @@ def main(args: Args):
     )
     parser = Parser(start_date=args.min_discovered, end_date=args.max_discovered)
     groups = parser.get_groups()
-    for group_name, group in groups.items():
+    groups = {group_name: group for group_name, group in groups.items() if args.groups is None or group_name.lower() in args.groups}
+    for group_index, (group_name, group) in enumerate(groups.items()):
         if args.groups and group_name.lower() not in args.groups:
             continue
-        logging.info(f"Processing group: {group_name}")
+        logging.info(f"Processing group {group_index + 1} of {len(groups)}: {group_name}")
         parser.build_group_bundle(group)
         bundle = parser.bundle
         with open(bundles_path / f"{group_name}.json", "w") as f:

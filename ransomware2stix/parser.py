@@ -368,25 +368,28 @@ class Parser:
     def parse_hashes(self, group_object, hash_type, hashes):
         objects = []
         for hash in hashes:
-            file_object = stix2.File(
-                hashes={hash_type: hash},
-            )
-            objects.append(file_object)
-            objects.append(
-                Relationship(
-                    id="relationship--"
-                    + get_relationship_id(group_object.id, file_object["id"]),
-                    source_ref=group_object.id,
-                    target_ref=file_object["id"],
-                    created=group_object.created,
-                    modified=group_object.modified,
-                    object_marking_refs=group_object.object_marking_refs,
-                    created_by_ref=group_object.created_by_ref,
-                    relationship_type="uses",
-                    description=f"{group_object.name} uses file with {hash_type}: {hash}",
-                    allow_custom=True,
+            try:
+                file_object = stix2.File(
+                    hashes={hash_type: hash},
                 )
-            )
+                objects.append(file_object)
+                objects.append(
+                    Relationship(
+                        id="relationship--"
+                        + get_relationship_id(group_object.id, file_object["id"]),
+                        source_ref=group_object.id,
+                        target_ref=file_object["id"],
+                        created=group_object.created,
+                        modified=group_object.modified,
+                        object_marking_refs=group_object.object_marking_refs,
+                        created_by_ref=group_object.created_by_ref,
+                        relationship_type="uses",
+                        description=f"{group_object.name} uses file with {hash_type}: {hash}",
+                        allow_custom=True,
+                    )
+                )
+            except Exception as e:
+                logging.warning(f"failed to parse {hash_type} hash ({hash}) for group {group_object['name']}: {e}")
         return objects
 
     def parse_tools(self, group_obj, tools):
