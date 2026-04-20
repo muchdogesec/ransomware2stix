@@ -240,7 +240,7 @@ class Parser:
             name=group_name,
             description=group.get("description"),
             primary_motivation="organizational-gain",
-            # threat_actor_types=[ "crime-syndicate"],
+            aliases=group.get("aliases", []),
             resource_level="team",
             object_marking_refs=self.OBJECT_MARKING_REFS,
             created_by_ref=self.CREATED_BY_REF,
@@ -312,13 +312,15 @@ class Parser:
                 case "btc":
                     wallet_objects = self.parse_addresses(group_object, ioc_values)
                     objects.extend(wallet_objects)
-                case 'sha256'|'sha-256':
-                    objects.extend(self.parse_hashes(group_object, "SHA-256", ioc_values))
-                case 'sha1' | 'sha-1':
+                case "sha256" | "sha-256":
+                    objects.extend(
+                        self.parse_hashes(group_object, "SHA-256", ioc_values)
+                    )
+                case "sha1" | "sha-1":
                     objects.extend(self.parse_hashes(group_object, "SHA-1", ioc_values))
-                case 'md5':
+                case "md5":
                     objects.extend(self.parse_hashes(group_object, "MD5", ioc_values))
-                case 'url' | 'ftp':
+                case "url" | "ftp":
                     for url in ioc_values:
                         url_object = stix2.URL(
                             value=url,
@@ -327,7 +329,9 @@ class Parser:
                         objects.append(
                             Relationship(
                                 id="relationship--"
-                                + get_relationship_id(group_object.id, url_object["id"]),
+                                + get_relationship_id(
+                                    group_object.id, url_object["id"]
+                                ),
                                 source_ref=group_object.id,
                                 target_ref=url_object["id"],
                                 created=group_object.created,
@@ -342,10 +346,10 @@ class Parser:
                                         source_name="url_type",
                                         external_id=ioc_type,
                                     )
-                                ]
+                                ],
                             )
                         )
-                case 'email':
+                case "email":
                     for email in ioc_values:
                         email_object = stix2.EmailAddress(
                             value=email,
@@ -354,7 +358,9 @@ class Parser:
                         objects.append(
                             Relationship(
                                 id="relationship--"
-                                + get_relationship_id(group_object.id, email_object["id"]),
+                                + get_relationship_id(
+                                    group_object.id, email_object["id"]
+                                ),
                                 source_ref=group_object.id,
                                 target_ref=email_object["id"],
                                 created=group_object.created,
@@ -366,10 +372,12 @@ class Parser:
                                 allow_custom=True,
                             )
                         )
-                case '_':
-                    logging.warning(f"unrecognized ioc type for group {group_name}: {ioc_type}")
+                case "_":
+                    logging.warning(
+                        f"unrecognized ioc type for group {group_name}: {ioc_type}"
+                    )
         return objects
-    
+
     def parse_hashes(self, group_object, hash_type, hashes):
         objects = []
         for hash in hashes:
@@ -394,7 +402,9 @@ class Parser:
                     )
                 )
             except Exception as e:
-                logging.warning(f"failed to parse {hash_type} hash ({hash}) for group {group_object['name']}: {e}")
+                logging.warning(
+                    f"failed to parse {hash_type} hash ({hash}) for group {group_object['name']}: {e}"
+                )
         return objects
 
     def parse_tools(self, group_obj, tools):
@@ -585,7 +595,7 @@ class Parser:
 
         incident_name = f"{victim_name} ransomed by {group_name}"
         claim_url = victim["claim_url"]
-        incident_id = str(uuid.uuid5(NAMESPACE, f"{incident_name}+{claim_url}"))
+        incident_id = str(uuid.uuid5(NAMESPACE, f"{incident_name}+{victim['id']}"))
         incident = Incident(
             id="incident--" + incident_id,
             object_marking_refs=self.OBJECT_MARKING_REFS,

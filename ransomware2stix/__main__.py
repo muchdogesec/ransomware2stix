@@ -107,6 +107,13 @@ def main(args: Args):
         Path("logs")
         / f"ransomware2stix-{(datetime.now().isoformat(timespec='seconds').replace(':', '-'))}.txt",
     )
+    for group_name, bundle in run(args):
+        logging.info(f"Finished processing group {group_name}, bundle has {len(bundle.objects)} objects")
+        with open(bundles_path / f"{group_name}.json", "w") as f:
+            fp_serialize(bundle, f, indent=4)
+            logging.info(f"Saved bundle for group {group_name} to {f.name}")
+
+def run(args):
     parser = Parser(start_date=args.min_discovered, end_date=args.max_discovered)
     groups = parser.get_groups()
     groups = {group_name: group for group_name, group in groups.items() if args.groups is None or group_name.lower() in args.groups}
@@ -115,10 +122,7 @@ def main(args: Args):
             continue
         logging.info(f"Processing group {group_index + 1} of {len(groups)}: {group_name}")
         parser.build_group_bundle(group)
-        bundle = parser.bundle
-        with open(bundles_path / f"{group_name}.json", "w") as f:
-            fp_serialize(bundle, f, indent=4)
-            logging.info(f"Saved bundle for group {group_name} to {f.name}")
+        yield group_name, parser.bundle
 
 
 if __name__ == "__main__":
