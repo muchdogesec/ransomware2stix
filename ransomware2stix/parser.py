@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import uuid
 from dateutil.parser import parse as dateutitl_parse_date
 
@@ -21,6 +22,7 @@ from stix2extensions.tools import crypto2stix
 
 NAMESPACE = uuid.UUID("7bae962c-40ae-5817-8cdc-e1b6eb4f38f5")
 DEFAULT_DATE = datetime(2020, 1, 1)
+CVE_RE = re.compile(r"CVE-\d{4}-\d{4,}")
 
 RANSOMWARE_LIVE_API_KEY = os.environ["RANSOMWARE_LIVE_API_KEY"]
 
@@ -263,7 +265,10 @@ class Parser:
         return obj
 
     def parse_vulnerabilities(self, group_obj, vulnerabilities):
-        cve_ids = {cve["CVE"] for cve in vulnerabilities}
+        cve_ids = set()
+        for cve in vulnerabilities:
+            cve_id = cve["CVE"]
+            cve_ids.update(CVE_RE.findall(cve_id))
         if not cve_ids:
             return []
         orig_len = len(cve_ids)
