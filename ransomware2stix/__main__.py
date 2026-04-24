@@ -121,6 +121,7 @@ def run(args):
         if args.groups and group_name.lower() not in args.groups:
             continue
         logging.info(f"Processing group {group_index + 1} of {len(groups)}: {group_name}")
+        parser.reset()
         parser.build_group_bundle(group)
         yield group_name, parser.bundle
 

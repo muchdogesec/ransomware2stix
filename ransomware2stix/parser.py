@@ -166,7 +166,6 @@ class Parser:
     valid_groups = None
 
     def __init__(self, start_date=None, end_date=None):
-        self.__parsed_groups = {}
         self.__parsed_objects = []
         self.__added_objects = set()
         self.start_date = start_date
@@ -214,6 +213,10 @@ class Parser:
             objects=self.parsed_objects,
             allow_custom=True,
         )
+    
+    def reset(self):
+        self.__parsed_objects = []
+        self.__added_objects = set()
 
     def build_group_bundle(self, group):
         self.add_objects(retriever.get_default_objects())
@@ -254,7 +257,6 @@ class Parser:
             obj, group["vulnerabilities"]
         )
         ioc_objects = self.parse_group_iocs(obj, group)
-        self.__parsed_groups[group_name] = obj
         self.add_objects(obj)
         self.add_objects(ioc_objects)
         self.add_objects(ttp_objects)
@@ -642,8 +644,6 @@ class Parser:
         return identity
 
     def get_group(self, group_name):
-        if group_name in self.__parsed_groups:
-            return self.__parsed_groups[group_name]
         url = f"https://api-pro.ransomware.live/groups/{group_name}"
         resp = self.session.get(url)
         resp_data = resp.json()
