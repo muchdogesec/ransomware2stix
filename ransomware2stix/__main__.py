@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 import logging
 import shutil
-import sys
 from stix2 import Identity
 from dotenv import load_dotenv
 from stix2.serialization import fp_serialize
@@ -55,8 +54,7 @@ def parse_identity(str):
 class Args:
     min_discovered: datetime
     max_discovered: datetime
-    group_name: str
-    combine: bool
+    groups: list[str]
 
 
 def parse_dt_arg(value):
@@ -84,15 +82,11 @@ def parse_args():
         type=parse_dt_arg,
     )
     parser.add_argument(
-        "--group_name",
+        "--groups",
         required=False,
-        help="Only process data related to a specific group. Default is all.",
-    )
-    parser.add_argument(
-        "--combine",
-        action="store_true",
-        default=False,
-        help="Should only create one bundle. setting to True will make separate bundle per group.",
+        nargs="+",
+        type=str.lower,
+        help="Only process data related to specific groups. Default is all.",
     )
     args: Args = parser.parse_args()
     if args.max_discovered:
@@ -113,19 +107,22 @@ def main(args: Args):
         Path("logs")
         / f"ransomware2stix-{(datetime.now().isoformat(timespec='seconds').replace(':', '-'))}.txt",
     )
+    for group_name, bundle in run(args):
+        logging.info(f"Finished processing group {group_name}, bundle has {len(bundle.objects)} objects")
+        with open(bundles_path / f"{group_name}.json", "w") as f:
+            fp_serialize(bundle, f, indent=4)
+            logging.info(f"Saved bundle for group {group_name} to {f.name}")
 
-    groups = Parser.parse_all_victims(
-        args.min_discovered,
-        args.max_discovered,
-        groups=args.group_name and [args.group_name],
-        combine_bundle=args.combine,
-        write_fs=True,
-    )
-    for group_name, parser in groups.items():
-        path = bundles_path / f"ransomware2stix_bundle--{group_name}.json"
-        with open(path, "w") as f:
-            fp_serialize(parser.bundle, f, indent=4)
-            logging.info(f"Wrote bundle output for `{group_name}` to `{path}`")
+def run(args):
+    parser = Parser(start_date=args.min_discovered, end_date=args.max_discovered)
+    groups = parser.get_groups()
+    groups = {group_name: group for group_name, group in groups.items() if args.groups is None or group_name.lower() in args.groups}
+    for group_index, (group_name, group) in enumerate(groups.items()):
+        if args.groups and group_name.lower() not in args.groups:
+            continue
+        logging.info(f"Processing group {group_index + 1} of {len(groups)}: {group_name}")
+        parser.build_group_bundle(group)
+        yield group_name, parser.bundle
 
 
 if __name__ == "__main__":

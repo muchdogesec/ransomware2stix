@@ -12,11 +12,6 @@ DEFAULT_OBJECT_URLS = [
 ]
 
 
-def get_victims():
-    resp = requests.get("https://data.ransomware.live/victims.json")
-    return resp.json()
-
-
 @lru_cache
 def get_default_objects():
     return [requests.get(url).json() for url in DEFAULT_OBJECT_URLS]
@@ -30,7 +25,9 @@ def _get_objects(endpoint, headers):
             endpoint, params=dict(page=page, page_size=1000), headers=headers
         )
         if resp.status_code != 200:
-            break
+            raise Exception(
+                f"Failed to retrieve objects from {endpoint}: {resp.status_code} {resp.text}"
+            )
         d = resp.json()
         if len(d["objects"]) == 0:
             break

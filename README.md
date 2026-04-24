@@ -26,7 +26,17 @@ python3 -m venv ransomware2stix-venv
 source ransomware2stix-venv/bin/activate
 # install requirements
 pip3 install -r requirements.txt
-````
+```
+
+### Environment Setup
+
+You will need a ransomware.live API key. [Sign up here](https://www.ransomware.live/#/regsiter) to get one.
+
+Create a `.env` file in the root directory:
+
+```shell
+RANSOMWARE_LIVE_API_KEY=YOUR_API_KEY_HERE
+```
 
 ## Run
 
@@ -34,34 +44,30 @@ pip3 install -r requirements.txt
 python3 -m ransomware2stix \
 	--min_discovered YYYY-MM-DD \
 	--max_discovered YYYY-MM-DD \
-	--group_name STRING \
-	--combine BOOLEAN
+	--groups GROUP_NAME [GROUP_NAME ...]
 ```
 
 Where:
 
-* `min_discovered` (optional, `YYYY-MM-DD`): This allows you to filter the results to only include incidents after the date entered. Default is all time.
-* `max_discovered` (optional, `YYYY-MM-DD`): This allows you to filter the results to only include incidents before the date entered. Default is all time.
-* `group_name` (optional): Filter the output to only include a single ransomware group. Default is all.
-* `combine` (optional, boolean): The script will produce a bundle for each ransomware by dafault. Use this to create a single bundle output for all results.
+* `--min_discovered` (optional, `YYYY-MM-DD`): Filter results to only include victims discovered after this date. Filters based on both attack date and discovery date. Default includes all historical data.
+* `--max_discovered` (optional, `YYYY-MM-DD`): Filter results to only include victims discovered before this date (inclusive, set to 23:59:59.999999 of the specified day). Default includes all future data.
+* `--groups` (optional): Filter output to only include specific ransomware group(s). Accepts one or more group names (space-separated). Group names are case-insensitive. Default processes all groups.
 
-The default output of this script is structured as follows;
+The script outputs JSON bundles to the `outputs/` directory:
 
 ```txt
-
-├── output
-│	├── bundles
-│   │	├── GROUP_1.json
-│	│	└── ...
-│   └── stix2_objects
-│   	├── GROUP_1
-│		└── ...
-...
+├── outputs
+│   └── bundles
+│       ├── <GROUP_NAME_1>.json
+│       ├── <GROUP_NAME_2>.json
+│       └── ...
+├── logs
+│   └── ransomware2stix-YYYY-MM-DDTHH-MM-SS.txt
 ```
 
 ### Examples
 
-Get data for all groups in January 2025:
+Get data for all groups with victims discovered in January 2025:
 
 ```shell
 python3 -m ransomware2stix \
@@ -69,22 +75,40 @@ python3 -m ransomware2stix \
 	--max_discovered 2025-01-31
 ```
 
-Get all data for clop;
+Get all data for the clop group:
 
 ```shell
 python3 -m ransomware2stix \
-	--group_name clop
+	--groups clop
 ```
 
-Note, to get all group names you can use the following request;
+Get data for multiple specific groups:
+
+```shell
+python3 -m ransomware2stix \
+	--groups clop akira lockbit3
+```
+
+Note, to get all available group names you can query the ransomware.live API:
 
 ```shell
 curl -X 'GET' \
-  'https://api.ransomware.live/v2/groups' \
-  -H 'accept: application/json'
+  'https://api-pro.ransomware.live/groups' \
+  -H 'X-API-KEY: YOUR_API_KEY'
 ```
 
-The `name` value in the response maps to `group_name` on the command line.
+The `group` value in the response can be used with the `--groups` argument.
+
+## How it Works
+
+For a detailed explanation of how ransomware2stix collects data from the ransomware.live API and converts it to STIX 2.1 objects, see [docs/README.md](docs/README.md).
+
+The documentation covers:
+
+* Data collection workflow and API endpoint optimization
+* STIX object generation for groups, victims, tools, TTPs, and IOCs
+* Relationship mapping between objects
+* UUIDv5 generation logic for deterministic IDs
 
 ## Useful supporting tools
 
