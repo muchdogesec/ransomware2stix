@@ -59,7 +59,11 @@ Example response (showing first 5 groups):
 }
 ```
 
-### 2.2 IOC Statistics Endpoint
+### 2.2 Enrich Group List Data
+
+The endpoints in this section are queried once at the start of processing, they provide a summary of what is available for each group. The information from these sections are used to optimize API usage.
+
+#### 2.2.1 IOC Statistics Endpoint
 
 This endpoint is queried at the start of processing. It provides a summary of what types of indicators of compromise (IOCs) are available for each group. This information is used to optimize API usage - before fetching detailed IOC data for a group, the software first checks this statistics data to see if the group has any IOCs available. This prevents unnecessary API calls for groups without indicators:
 
@@ -113,7 +117,48 @@ Example response (showing first 5 groups):
 }
 ```
 
-### 2.3 Group Details Endpoint
+#### 2.2.2 Ransom Notes Endpoint
+
+```shell
+curl -X 'GET' \
+  'https://api-pro.ransomware.live/ransomnotes' \
+  -H 'X-API-KEY: YOUR_API_KEY'
+```
+
+Example response (showing first 5 groups):
+
+```json
+{
+  "client": "random@dogesec.com",
+  "count": 223,
+  "groups": [
+    {
+      "group": ".git",
+      "ransomnotes_count": 7
+    },
+    {
+      "group": "0apt",
+      "ransomnotes_count": 1
+    },
+    {
+      "group": "3am",
+      "ransomnotes_count": 1
+    },
+    {
+      "group": "8base",
+      "ransomnotes_count": 3
+    },
+    {
+      "group": "Babuk2",
+      "ransomnotes_count": 1
+    }
+  ]
+}
+```
+
+### 2.3 Group Details
+
+#### 2.3.1 Group's detail
 
 This endpoint provides comprehensive information about a specific ransomware group including description, dark web locations, tools used, tactics/techniques/procedures (TTPs), and known vulnerabilities exploited:
 
@@ -127,7 +172,7 @@ Example response (truncated for brevity):
 
 ```json
 {
-  "client": "folawumi@dogesec.com",
+  "client": "random@dogesec.com",
   "group": "akira",
   "description": "The Akira ransomware group is said to have emerged in March 2023, and there's much speculation about its ties to the former CONTI ransomware group.<br> <br> It's worth noting that with the end of CONTI's operation, several affiliates migrated to independent campaigns such as Royal, BlackBasta, and others.<br> <br> According to some reports, Akira affiliates also work with other ransomware operations, such as Snatch and BlackByte, as an open directory of tools used by an Akira operator was identified, which also had connections to the Snatch ransomware.<br> <br> The first version of the Akira ransomware was written in C++ and appended files with the '.akira' extension, creating a ransom note named 'akira_readme.txt,' partially based on the Conti V2 source code. However, on June 29, 2023, a decryptor for this version was reportedly released by Avast.<br> <br> Subsequently, a version was released that fixed the decryption flaw on July 2, 2023. Since then, the new version is said to be written in Rust, this time called 'megazord.exe,' and it changes the extension to '.powerranges' for encrypted files.<br> <br> Most of Akira's initial access vectors use brute-force attempts on Cisco VPN devices (which use single-factor authentication only).<br> Additionally, exploitation of CVEs: CVE-2019-6693 and CVE-2022-40684 for initial access has been identified.<BR>Source: https://github.com/crocodyli/ThreatActors-TTPs",
   "victims": 1448,
@@ -278,94 +323,34 @@ Example response (truncated for brevity):
 }
 ```
 
-## 3. STIX Object Generation
+#### 2.3.2 Ransom Notes
 
-For each ransomware group, ransomware2stix generates STIX 2.1 objects representing different aspects of the threat intelligence. All objects use UUIDv5 with namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` for deterministic, reproducible IDs.
-
-### 3.1 Intrusion Set Object
-
-Each ransomware group is represented as an Intrusion Set object. The group's name, description, first/last seen dates, and dark web locations are included:
-
-```json
-{
-  "type": "intrusion-set",
-  "spec_version": "2.1",
-  "id": "intrusion-set--<UUID V5>",
-  "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
-  "created": "<SCRIPT FIRST RUN TIME>",
-  "modified": "<HIGHEST location.updated TIME, ELSE CREATED TIME",
-  "name": "<name>",
-  "description": "<description>",
-  "primary_motivation": "organizational-gain",
-  "threat_actor_types": [ "crime-syndicate"],
-  "resource_level": "team",
-  "object_marking_refs": [
-      "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-      "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
-  ],
-  "external_references": [
-    {
-      "source_name": "darkweb_site",
-      "url": "<locations.slug>"
-    } 
-  ],
-}
+```shell
+curl -X 'GET' \
+  'https://api-pro.ransomware.live/ransomnotes/akira' \
+  -H 'X-API-KEY: YOUR_API_KEY'
 ```
 
-**UUIDv5 Generation:** namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `<group_name>`
-
-### 3.2 MITRE ATT&CK Techniques
-
-The TTPs reported for each group include MITRE ATT&CK technique IDs. ransomware2stix extracts these technique IDs and retrieves the full MITRE ATT&CK Technique and Tactic objects from CTI Butler. Each technique is then linked to the Intrusion Set via a relationship object that includes any additional context provided (e.g., "Utilizes compromised VPN credentials"):
+Example response
 
 ```json
 {
-  "type": "relationship",
-  "spec_version": "2.1",
-  "id": "relationship--<UUIDV5 LOGIC>",
-  "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
-  "created": "",
-  "modified": "",
-  "relationship_type": "uses",
-  "description": "<group name> uses <attack ID>",
-  "source_ref": "intrusion-set--<ID>",
-  "target_ref": "<MITRE ATTACK OBJECT>",
-  "object_marking_refs": [
-      "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-      "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
+  "client": "random@dogesec.com",
+  "group": "akira",
+  "count": 3,
+  "ransomnotes": [
+    "akira_readme", // ransomnote_id
+    "akira_readme_2",
+    "akira_readme_3"
   ]
 }
 ```
 
-**UUIDv5 Generation:** namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`
-
-### 3.3 Vulnerabilities (CVEs)
-
-When group descriptions or vulnerability data mention CVE identifiers (format: CVE-YYYY-NNNNN), ransomware2stix extracts these CVE IDs and retrieves the corresponding STIX Vulnerability objects from CTI Butler. Relationship objects are created showing that the Intrusion Set exploits these vulnerabilities.
-
-### 3.4 Bitcoin Wallets
-
-Bitcoin addresses found in the IOCs are converted to cryptocurrency-wallet objects using the crypto2stix library:
-
-```json
-{
-  "type": "cryptocurrency-wallet",
-  "spec_version": "2.1",
-  "id": "cryptocurrency-wallet--<STIX2 LIB UUIDv5 LOGIC>",
-  "address": "<btc_address>",
-  "extensions": {
-    "extension-definition--be78509e-6958-51b1-8b26-d17ee0eba2d7": {
-      "extension_type": "new-sco"
-    }
-  }
-}
-```
-
-Using [crypto2stix](https://github.com/muchdogesec/stix2extensions/blob/main/stix2extensions/tools/crypto2stix.py), ransomware2stix can optionally retrieve all Bitcoin transaction and wallet objects for related addresses. Extension definitions are automatically imported to the bundle.
-
 ### 2.4 IOCs Endpoint
 
 This endpoint is only queried if the IOC statistics show the group has indicators available. It returns various types of indicators of compromise including file hashes (SHA-256, SHA-1, MD5), Bitcoin addresses, URLs, and email addresses:
+
+URL: `https://api-pro.ransomware.live/iocs/{group}`
 
 ```shell
 curl -X 'GET' \
@@ -407,20 +392,35 @@ Example response (showing first 5 items of each type):
 }
 ```
 
-### 3.5 IOC Objects
 
-Different IOC types are converted to appropriate STIX Cyber Observable objects:
+### 2.5 Ransom Note detail Endpoint
 
-- **SHA-256, SHA-1, MD5**: Created as File objects with corresponding hash values in the hashes dictionary
-- **Bitcoin addresses**: Processed using crypto2stix to create cryptocurrency-wallet objects
-- **URLs/FTP**: Created as URL objects
-- **Email addresses**: Created as EmailAddress objects
+URL: `https://api-pro.ransomware.live/ransomnotes/{group}/{note_name}`
 
-Each IOC is linked to the Intrusion Set via a "uses" relationship that describes how the group uses that indicator.
+```shell
+curl -X 'GET' \
+  'https://api-pro.ransomware.live/ransomnotes/akira/akira_readme_3' \
+  -H 'X-API-KEY: YOUR_API_KEY'
+```
+
+Example response
+
+```json
+{
+  "client": "random@dogesec.com",
+  "group": "akira",
+  "id": "9abd3efde8b38c0372153fa413b4eab5",
+  "note_name": "akira_readme_3",
+  "extension": ".txt",
+  "content": "Hi friends,\n\nWhatever who you are and what your title is, if you're reading this it means the internal infrastructure of your company is fully or partially dead, all your backups - virtual, physical - everything that we managed to reach - are completely removed. Moreover, we have taken a great amount of your corporate data prior to encryption.\n\n\n\nATTENTION! Strictly prohibited:\n\n- Deleting files with .arika extension;\n\n- Replacing or renaming .arika and .akira files;\n\n- Using third party software to recover your systems.\n\nIf you violate these rules, we cannot guarantee a successful recovery.\n\n\n\nWell, for now let's keep all the tears and resentment to ourselves and try to build a constructive dialogue. We're fully aware of what damage we caused by locking your internal sources. At the moment, you have to know:\n\n\n\n1. Dealing with us you will save A LOT due to we are not interested in ruining you financially. We will study in depth your finance, bank & income statements, your savings, investments etc. and present our reasonable demand to you. If you have an active cyber insurance, let us know and we will guide you how to properly use it. Also, dragging out the negotiation process will lead to failing of the deal.\n\n2. Paying us you save your TIME, MONEY, EFFORTS and be back on track within 24 hours approximately. Our decryptor works properly on any files or systems, so you will be able to check it by requesting a test decryption service from the beginning of our conversation. If you decide to recover on your own, keep in mind that you can permanently lose access to some files or accidentally corrupt them - in this case we won't be able to help.\n\n3. The security report or the exclusive first-hand information that you will receive upon reaching an agreement is of great value, since NO full audit of your network will show you the vulnerabilities that we've managed to detect and use in order to get into, identify backup solutions and download your data.\n\n4. As for your data, if we fail to agree, we will try to sell personal information/trade secrets/databases/source codes - generally speaking, everything that has a value on the darkmarket - to multiple threat actors at once. Then all of this will be published in our blog - akiral2iz6a7qgd3ayp3l6yub7xx2uep76idk3u2kollpj5z3z636bad[.]onion.\n\n5. We're more than negotiable and will definitely find a way to settle this quickly and reach an agreement which will satisfy both of us.\n\n6. Negotiations with Akira can only be conducted in a chat room, which you can access using the login details provided below or in the notes (a readme.txt file) in your systems. You should ignore any attempts (such as emails/social media messages, phone calls, etc.) to redirect you to another chat or email address (proton.me is often used by unauthorized individuals) on our behalf.\n\n7. Be careful while working with recovery agencies as they often try to use your cyber incident to stuff their pockets. There are many risks for you to lose money and get nothing in return.\n\n\n\nIf you're indeed interested in our assistance and the services we provide you can reach out to us following simple instructions:\n\n\n\n1. Install TOR Browser to get access to our chat room - torproject[.]org/download/.\n\n2. Paste this link - https://akiralkzxzq2dsrzsrvbr2xgbbu2wgsmxryd4csgfameg52n7efvr2id.onion/d/[snip] .\n\n3. Use this code - [snip] - to log into our chat.\n\n\n\nKeep in mind that the faster you will get in touch, the less damage we cause.\n"
+}
+```
 
 ### 2.5 Victims Endpoint
 
 This endpoint is only queried for groups that have posted victims (victim count > 0). It returns detailed information about each victim including organization name, website, country, industry sector, and the date of the attack:
+
+URL: `https://api-pro.ransomware.live/victims/?group={group}`
 
 ```shell
 curl -X 'GET' \
@@ -508,6 +508,151 @@ Example response (showing selected victims with complete data):
   ]
 }
 ```
+
+
+
+
+## 3. STIX Object Generation
+
+For each ransomware group, ransomware2stix generates STIX 2.1 objects representing different aspects of the threat intelligence. All objects use UUIDv5 with namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` for deterministic, reproducible IDs.
+
+### 3.1 Intrusion Set Object
+
+Each ransomware group is represented as an Intrusion Set object. The group's name, description, first/last seen dates, and dark web locations are included:
+
+```json
+{
+  "type": "intrusion-set",
+  "spec_version": "2.1",
+  "id": "intrusion-set--<UUID V5>",
+  "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
+  "created": "<SCRIPT FIRST RUN TIME>",
+  "modified": "<HIGHEST location.updated TIME, ELSE CREATED TIME",
+  "name": "<name>",
+  "description": "<description>",
+  "primary_motivation": "organizational-gain",
+  "threat_actor_types": [ "crime-syndicate"],
+  "resource_level": "team",
+  "object_marking_refs": [
+      "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
+      "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
+  ],
+  "external_references": [
+    {
+      "source_name": "darkweb_site",
+      "url": "<locations.slug>"
+    } 
+  ],
+}
+```
+
+**UUIDv5 Generation:** namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `<group_name>`
+
+### 3.2 MITRE ATT&CK Techniques
+
+The TTPs reported for each group include MITRE ATT&CK technique IDs. ransomware2stix extracts these technique IDs and retrieves the full MITRE ATT&CK Technique and Tactic objects from CTI Butler. Each technique is then linked to the Intrusion Set via a relationship object that includes any additional context provided (e.g., "Utilizes compromised VPN credentials"):
+
+```json
+{
+  "type": "relationship",
+  "spec_version": "2.1",
+  "id": "relationship--<UUIDV5 LOGIC>",
+  "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
+  "created": "",
+  "modified": "",
+  "relationship_type": "uses",
+  "description": "<group name> uses <attack ID>",
+  "source_ref": "intrusion-set--<ID>",
+  "target_ref": "<MITRE ATTACK OBJECT>",
+  "object_marking_refs": [
+      "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
+      "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
+  ]
+}
+```
+
+**UUIDv5 Generation:** namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`
+
+### 3.3 Vulnerabilities (CVEs)
+
+When group descriptions or vulnerability data mention CVE identifiers (format: CVE-YYYY-NNNNN), ransomware2stix extracts these CVE IDs and retrieves the corresponding STIX Vulnerability objects from CTI Butler. Relationship objects are created showing that the Intrusion Set exploits these vulnerabilities.
+
+### 3.4 Bitcoin Wallets
+
+Bitcoin addresses found in the IOCs are converted to cryptocurrency-wallet objects using the crypto2stix library:
+
+```json
+{
+  "type": "cryptocurrency-wallet",
+  "spec_version": "2.1",
+  "id": "cryptocurrency-wallet--<STIX2 LIB UUIDv5 LOGIC>",
+  "address": "<btc_address>",
+  "extensions": {
+    "extension-definition--be78509e-6958-51b1-8b26-d17ee0eba2d7": {
+      "extension_type": "new-sco"
+    }
+  }
+}
+```
+
+Using [crypto2stix](https://github.com/muchdogesec/stix2extensions/blob/main/stix2extensions/tools/crypto2stix.py), ransomware2stix can optionally retrieve all Bitcoin transaction and wallet objects for related addresses. Extension definitions are automatically imported to the bundle.
+
+### 3.5 IOC Objects
+
+Different IOC types are converted to appropriate STIX Cyber Observable objects:
+
+- **SHA-256, SHA-1, MD5**: Created as File objects with corresponding hash values in the hashes dictionary
+- **Bitcoin addresses**: Processed using crypto2stix to create cryptocurrency-wallet objects
+- **URLs/FTP**: Created as URL objects
+- **Email addresses**: Created as EmailAddress objects
+
+Each IOC is linked to the Intrusion Set via a "uses" relationship that describes how the group uses that indicator.
+
+### 3.6 Ransom Notes
+
+A STIX `note` object is created
+
+```json
+{
+  "type": "note",
+  "spec_version": "2.1",
+  "id": "note--<UUIDV5>",
+  "created": "<SAME AS INTRUSION SET>",
+  "modified": "<SAME AS INTRUSION SET>",
+  "external_references": [
+  ],
+  "abstract": "<note_name>",
+  "content": "<content>",
+  "object_refs": ["intrusion-set--<ID>"]
+}
+```
+
+**UUIDv5 Generation:** namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `<group_name>+<note_name>`
+
+**Relationships Created:**
+
+1. **Note → Intrusion Set** ("related-to" relationship):
+
+```json
+{
+  "type": "relationship",
+  "spec_version": "2.1",
+  "id": "relationship--<UUIDV5 LOGIC>",
+  "created_by_ref": "identity--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5",
+  "created": "<SAME AS INTRUSION SET>",
+  "modified": "<SAME AS INTRUSION SET>",
+  "relationship_type": "related-to",
+  "source_ref": "note--<ID>",
+  "target_ref": "intrusion-set--<ID>",
+  "object_marking_refs": [
+      "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
+      "marking-definition--7bae962c-40ae-5817-8cdc-e1b6eb4f38f5"
+  ]
+}
+```
+
+**UUIDv5 Generation:** namespace `7bae962c-40ae-5817-8cdc-e1b6eb4f38f5` + `source_ref+target_ref`
+
 
 ### 3.6 Victim Identity Objects
 

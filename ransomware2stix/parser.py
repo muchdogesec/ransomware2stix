@@ -15,6 +15,7 @@ from stix2 import (
     Incident,
     Tool,
     Bundle,
+    Note,
 )
 from stix2.utils import format_datetime, STIXdatetime, Precision
 from datetime import datetime
@@ -165,11 +166,12 @@ class Parser:
     ]
     valid_groups = None
 
-    def __init__(self, start_date=None, end_date=None):
+    def __init__(self, start_date=None, end_date=None, should_process_ransomnotes=True):
         self.__parsed_objects = []
         self.__added_objects = set()
         self.start_date = start_date
         self.end_date = end_date
+        self.should_process_ransomnotes = should_process_ransomnotes
         self.session = requests.Session()
         self.session.headers = {"X-API-KEY": RANSOMWARE_LIVE_API_KEY}
 
@@ -178,10 +180,20 @@ class Parser:
             for location in retriever.get_location_objects()
         }
         self.ioc_stats = self.get_ioc_stats()
+        self.ransomnote_stats = self.get_ransomnote_stats()
 
     def get_ioc_stats(self):
         r = self.session.get("https://api-pro.ransomware.live/iocs")
         return {ioc_stat["group"].lower(): ioc_stat for ioc_stat in r.json()["groups"]}
+
+    def get_ransomnote_stats(self):
+        if not self.should_process_ransomnotes:
+            return {}
+        r = self.session.get("https://api-pro.ransomware.live/ransomnotes")
+        return {
+            stat["group"].lower(): stat["ransomnotes_count"]
+            for stat in r.json()["groups"]
+        }
 
     def get_groups(self):
         r = self.session.get("https://api-pro.ransomware.live/groups")
@@ -213,7 +225,7 @@ class Parser:
             objects=self.parsed_objects,
             allow_custom=True,
         )
-    
+
     def reset(self):
         self.__parsed_objects = []
         self.__added_objects = set()
@@ -257,7 +269,9 @@ class Parser:
             obj, group["vulnerabilities"]
         )
         ioc_objects = self.parse_group_iocs(obj, group)
+        ransomnote_objects = self.parse_group_ransomnotes(obj)
         self.add_objects(obj)
+        self.add_objects(ransomnote_objects)
         self.add_objects(ioc_objects)
         self.add_objects(ttp_objects)
         self.add_objects(vulnerability_objects)
@@ -298,6 +312,60 @@ class Parser:
                 f"Found {orig_len - len(cve_ids)} out of {orig_len} CVEs. Missing: {cve_ids}"
             )
         return objects
+
+    def parse_group_ransomnotes(self, group_obj):
+        group_name = group_obj["name"]
+        if not self.ransomnote_stats.get(group_name.lower()):
+            return []
+        objects = []
+        resp = self.session.get(
+            f"https://api-pro.ransomware.live/ransomnotes/{group_name}"
+        )
+        resp.raise_for_status()
+        note_names = resp.json()["ransomnotes"]
+        for note_name in note_names:
+            objects.extend(self.process_ransomnote(group_obj, note_name))
+        return objects
+
+    def process_ransomnote(self, group_obj, note_name):
+        group_name = group_obj["name"]
+        resp = self.session.get(
+            f"https://api-pro.ransomware.live/ransomnotes/{group_name}/{note_name}"
+        )
+        resp.raise_for_status()
+        response_data = resp.json()
+        response_data["group_name"] = group_name.lower()
+        note_id = str(uuid.uuid5(NAMESPACE, f"{group_name}+{note_name}"))
+        note_obj = Note(
+            id="note--" + note_id,
+            created_by_ref=group_obj.created_by_ref,
+            created=group_obj.created,
+            modified=group_obj.modified,
+            object_marking_refs=group_obj.object_marking_refs,
+            abstract=note_name,
+            content=response_data["content"],
+            object_refs=[group_obj["id"]],
+            external_references=[
+                {
+                    "source_name": "ransomware.live",
+                    "url": "https://www.ransomware.live/ransomnote/{group_name}/{note_name}{extension}".format_map(response_data),
+                    "external_id": response_data["id"],
+                }
+            ],
+        )
+        rel = Relationship(
+            id="relationship--" + get_relationship_id(group_obj["id"], note_obj["id"]),
+            source_ref=note_obj["id"],
+            target_ref=group_obj["id"],
+            created=group_obj["created"],
+            modified=group_obj["modified"],
+            object_marking_refs=group_obj["object_marking_refs"],
+            created_by_ref=group_obj["created_by_ref"],
+            relationship_type="related-to",
+            description=f"Note is used by {group_obj['name']}",
+        )
+
+        return (note_obj, rel)
 
     def parse_group_iocs(self, group_object, group_data):
         group_name = group_data["group"]
