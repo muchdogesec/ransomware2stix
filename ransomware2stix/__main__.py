@@ -88,6 +88,12 @@ def parse_args():
         type=str.lower,
         help="Only process data related to specific groups. Default is all.",
     )
+    parser.add_argument(
+        "--process_ransomnotes",
+        action="store_true",
+        help="Whether to process ransomnotes. Default is False.",
+    )
+
     args: Args = parser.parse_args()
     if args.max_discovered:
         args.max_discovered = args.max_discovered.replace(
@@ -114,7 +120,7 @@ def main(args: Args):
             logging.info(f"Saved bundle for group {group_name} to {f.name}")
 
 def run(args):
-    parser = Parser(start_date=args.min_discovered, end_date=args.max_discovered)
+    parser = Parser(start_date=args.min_discovered, end_date=args.max_discovered, should_process_ransomnotes=args.process_ransomnotes)
     groups = parser.get_groups()
     groups = {group_name: group for group_name, group in groups.items() if args.groups is None or group_name.lower() in args.groups}
     for group_index, (group_name, group) in enumerate(groups.items()):
