@@ -18,7 +18,7 @@ from stix2 import (
     Note,
 )
 from stix2.utils import format_datetime, STIXdatetime, Precision
-from datetime import datetime
+from datetime import UTC, datetime
 from stix2extensions.tools import crypto2stix
 
 NAMESPACE = uuid.UUID("7bae962c-40ae-5817-8cdc-e1b6eb4f38f5")
@@ -29,10 +29,15 @@ RANSOMWARE_LIVE_API_KEY = os.environ["RANSOMWARE_LIVE_API_KEY"]
 
 
 def parse_date(date_string: str):
-    return date_string and STIXdatetime(
+    if not date_string:
+        return
+    dt = STIXdatetime(
         dateutitl_parse_date(date_string),
         precision=Precision.MILLISECOND,
     )
+    if not dt.tzinfo:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
 
 
 def get_relationship_id(source_ref, target_ref, created=None):
@@ -166,12 +171,12 @@ class Parser:
     ]
     valid_groups = None
 
-    def __init__(self, start_date=None, end_date=None, should_process_ransomnotes=True):
+    def __init__(self, start_date=None, end_date=None, process_all_ransomnotes=True):
         self.__parsed_objects = []
         self.__added_objects = set()
         self.start_date = start_date
         self.end_date = end_date
-        self.should_process_ransomnotes = should_process_ransomnotes
+        self.process_all_ransomnotes = process_all_ransomnotes
         self.session = requests.Session()
         self.session.headers = {"X-API-KEY": RANSOMWARE_LIVE_API_KEY}
 
@@ -187,8 +192,6 @@ class Parser:
         return {ioc_stat["group"].lower(): ioc_stat for ioc_stat in r.json()["groups"]}
 
     def get_ransomnote_stats(self):
-        if not self.should_process_ransomnotes:
-            return {}
         r = self.session.get("https://api-pro.ransomware.live/ransomnotes")
         return {
             stat["group"].lower(): stat["ransomnotes_count"]
@@ -229,6 +232,7 @@ class Parser:
     def reset(self):
         self.__parsed_objects = []
         self.__added_objects = set()
+        self.victims = set()
 
     def build_group_bundle(self, group):
         self.add_objects(retriever.get_default_objects())
@@ -242,16 +246,11 @@ class Parser:
         group_name = group["group"]
         slugs = []
         for location in group["locations"]:
-            location["lastscrape"] = parse_date(location["lastscrape"])
-            location["updated"] = parse_date(location["updated"])
             slugs.append(dict(source_name="darkweb_site", url=location["slug"]))
-        group["locations"] = sorted(
-            group["locations"], key=lambda x: x["updated"] or datetime.min, reverse=True
-        )
         obj = IntrusionSet(
             id="intrusion-set--" + str(uuid.uuid5(NAMESPACE, group_name)),
             created=parse_date(group["firstseen"]),
-            modified=group["locations"] and group["locations"][0]["updated"],
+            modified=parse_date(group["lastseen"]),
             name=group_name,
             description=group.get("description"),
             primary_motivation="organizational-gain",
@@ -269,15 +268,18 @@ class Parser:
             obj, group["vulnerabilities"]
         )
         ioc_objects = self.parse_group_iocs(obj, group)
-        ransomnote_objects = self.parse_group_ransomnotes(obj)
         self.add_objects(obj)
-        self.add_objects(ransomnote_objects)
         self.add_objects(ioc_objects)
         self.add_objects(ttp_objects)
         self.add_objects(vulnerability_objects)
         self.parse_tools(obj, group["tools"])
         if group["victims"]:
             self.fetch_and_parse_victims(obj, group)
+        if self.victims or self.process_all_ransomnotes:
+            # only fetch ransomnote_objects if there are new victims
+            ransomnote_objects = self.parse_group_ransomnotes(obj)
+            self.add_objects(ransomnote_objects)
+
         return obj
 
     def parse_vulnerabilities(self, group_obj, vulnerabilities):
@@ -324,7 +326,10 @@ class Parser:
         resp.raise_for_status()
         note_names = resp.json()["ransomnotes"]
         for note_name in note_names:
-            objects.extend(self.process_ransomnote(group_obj, note_name))
+            try:
+                objects.extend(self.process_ransomnote(group_obj, note_name))
+            except Exception as e:
+                logging.warning(f"Could not parse ransomnote `{note_name}` for `{group_name}`: {e}")
         return objects
 
     def process_ransomnote(self, group_obj, note_name):
@@ -605,20 +610,13 @@ class Parser:
         return attack_objects + relationship_objects
 
     def parse_victim(self, group_obj, victim):
-        victim.update(
-            group=victim.get("group", victim.get("group_name")),
-            attackdate=victim.get("attackdate", victim.get("published")),
-            claim_url=victim.get("claim_url", victim.get("post_url")),
-            domain=victim.get("domain", victim.get("website")),
-            victim=victim.get("victim", victim.get("post_title")),
-        )
         group_name = victim["group"]
         victim_name = victim["victim"].lower()
 
-        modified_date = parse_date(victim["discovered"])
-        attack_date = parse_date(victim["attackdate"]) or modified_date
-        if (self.start_date and max(attack_date, modified_date) < self.start_date) or (
-            self.end_date and max(attack_date, modified_date) > self.end_date
+        discovered_time = parse_date(victim['discovered'])
+        attack_date = parse_date(victim['attackdate']) or discovered_time
+        if (self.start_date and max(attack_date, discovered_time) < self.start_date) or (
+            self.end_date and max(attack_date, discovered_time) > self.end_date
         ):
             return
 
@@ -637,12 +635,13 @@ class Parser:
             modified="2020-01-01T00:00:00.000Z",
             name=victim_name,
             description=victim["description"],
-            contact_information=victim["domain"].lower(),
+            contact_information=victim["website"],
             identity_class="organization",
             sectors=mapped_sector,
             object_marking_refs=self.OBJECT_MARKING_REFS,
         )
         self.add_objects(identity)
+        self.victims.add(identity.name)
 
         location = self.locations.get(victim["country"])
         if location:
@@ -664,16 +663,16 @@ class Parser:
             )
 
         incident_name = f"{victim_name} ransomed by {group_name}"
-        claim_url = victim["claim_url"]
+        claim_url = victim["post_url"]
         incident_id = str(uuid.uuid5(NAMESPACE, f"{incident_name}+{victim['id']}"))
         incident = Incident(
             id="incident--" + incident_id,
             object_marking_refs=self.OBJECT_MARKING_REFS,
             created_by_ref=self.CREATED_BY_REF,
             created=attack_date,
-            modified=modified_date,
+            modified=discovered_time,
             name=incident_name,
-            description=victim["claim_url"],
+            description=claim_url,
             external_references=[
                 {"source_name": "ransomware.live", "url": victim["permalink"]},
             ],

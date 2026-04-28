@@ -11,7 +11,7 @@ from stix2 import Identity
 from dotenv import load_dotenv
 from stix2.serialization import fp_serialize
 
-from ransomware2stix.parser import Parser
+from ransomware2stix.parser import Parser, parse_date
 
 
 def configureLogging():
@@ -60,7 +60,9 @@ class Args:
 def parse_dt_arg(value):
     """Convert the created timestamp to a datetime object."""
     try:
-        return datetime.strptime(value, "%Y-%m-%d")
+        v = parse_date(value)
+        assert v != None
+        return v
     except ValueError:
         raise argparse.ArgumentTypeError("Invalid date format. Use YYYY-MM-DD")
 
@@ -71,13 +73,11 @@ def parse_args():
     )
     parser.add_argument(
         "--min_discovered",
-        default=datetime.min,
         help="Minimum discovered date for incident/victim",
         type=parse_dt_arg,
     )
     parser.add_argument(
         "--max_discovered",
-        default=datetime.max,
         help="Maximum discovered date for incident/victim",
         type=parse_dt_arg,
     )
@@ -89,9 +89,9 @@ def parse_args():
         help="Only process data related to specific groups. Default is all.",
     )
     parser.add_argument(
-        "--process_ransomnotes",
+        "--process_all_ransomnotes",
         action="store_true",
-        help="Whether to process ransomnotes. Default is False.",
+        help="Whether to process all ransomnotes. Default is to only process for groups with new victims.",
     )
 
     args: Args = parser.parse_args()
@@ -120,7 +120,7 @@ def main(args: Args):
             logging.info(f"Saved bundle for group {group_name} to {f.name}")
 
 def run(args):
-    parser = Parser(start_date=args.min_discovered, end_date=args.max_discovered, should_process_ransomnotes=args.process_ransomnotes)
+    parser = Parser(start_date=args.min_discovered, end_date=args.max_discovered, process_all_ransomnotes=args.process_all_ransomnotes)
     groups = parser.get_groups()
     groups = {group_name: group for group_name, group in groups.items() if args.groups is None or group_name.lower() in args.groups}
     for group_index, (group_name, group) in enumerate(groups.items()):
