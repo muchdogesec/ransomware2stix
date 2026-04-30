@@ -55,6 +55,7 @@ class Args:
     min_discovered: datetime
     max_discovered: datetime
     groups: list[str]
+    process_all_ransomnotes: bool
 
 
 def parse_dt_arg(value):
@@ -95,6 +96,7 @@ def parse_args():
     )
 
     args: Args = parser.parse_args()
+    args = Args(**args.__dict__)
     if args.max_discovered:
         args.max_discovered = args.max_discovered.replace(
             hour=23, minute=59, second=59, microsecond=999_999
