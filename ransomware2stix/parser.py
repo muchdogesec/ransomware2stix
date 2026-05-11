@@ -21,6 +21,8 @@ from stix2.utils import format_datetime, STIXdatetime, Precision
 from datetime import UTC, datetime
 from stix2extensions.tools import crypto2stix
 
+from ransomware2stix.utils import sanitize_str
+
 NAMESPACE = uuid.UUID("7bae962c-40ae-5817-8cdc-e1b6eb4f38f5")
 DEFAULT_DATE = datetime(2020, 1, 1)
 CVE_RE = re.compile(r"CVE-\d{4}-\d{4,}")
@@ -348,7 +350,7 @@ class Parser:
             modified=group_obj.modified,
             object_marking_refs=group_obj.object_marking_refs,
             abstract=note_name,
-            content=response_data["content"],
+            content=sanitize_str(response_data["content"]),
             object_refs=[group_obj["id"]],
             external_references=[
                 {
